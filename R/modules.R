@@ -156,7 +156,39 @@ introductions_functions <- function(le){
       accept_pbe("ir")
     }
   }
-  le$updaters[["update_R"]] <- function(){}
+
+  le$updaters[["update_R"]] <- function(){
+     ### create an up-to-date proposal-environment
+    prepare_pbe()
+    
+    ### making variables and parameters available within the function
+    le <- environment()
+    h <- pbe0$h
+    p <- pbe1$p
+    v <- pbe1$v
+    
+    ### check whether to estimate
+    if(!h$est.ir) return()
+    
+    p$R <- exp(log(p$R) + rnorm(1, 0, h$si.ir))
+    
+    ### update proposal environment
+    copy2pbe1("p", le)
+    
+    ### calculate proposalratio
+    logproposalratio <- log(p$R) - log(pbe0$p$R)
+    
+    ### calculate likelihood
+    propose_pbe("R")
+    
+    ### calculate acceptance probability
+    logaccprob <- pbe1$logLikgen - pbe0$logLikgen + logproposalratio
+    
+    ### accept
+    if (runif(1) < exp(logaccprob)) {
+      accept_pbe("R")
+    }
+  }
   
   return(le)
 }
@@ -466,6 +498,12 @@ infectivity_parameters <- function(le, admission.times = NULL, removal.times = N
     
     # If removal times are present, use adjusted Gamma distribution
     # Dataslot
+    if (is.null(removal.times)) {
+      if (!is.null(le$dataset$removal.times)) {
+        removal.times = le$dataset$removal.times
+      }
+    }
+
     le$dataslot <- c(le$dataslot, list(
       admission.times = admission.times,
       removal.times = removal.times
@@ -554,8 +592,13 @@ infectivity_parameters <- function(le, admission.times = NULL, removal.times = N
   
   else {
   # Check for removal times
-  if (is.null(removal.times))
-    stop("Provide removal times in same order as hosts")
+  if (is.null(removal.times)){
+    if (!is.null(le$dataset$removal.times)) {
+      removal.times = le$dataset$removal.times
+    } else {
+      stop("Provide removal times in same order as hosts")
+    }
+  }
   
   # Load user-defined infectivity
   # if(trans.model == "user") {
