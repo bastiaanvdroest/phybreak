@@ -352,119 +352,72 @@ spatial_functions <- function(le){
 ### Contact
 #' Module for contact data
 #' 
-#' @param cnt.invest.trans      Probability for transmission pair that contact took place (\eqn{\eta})
-#' @param cnt.invest.nontrans   Probability for non-transmission pair that contact took place (\eqn{\lambda})
-#' @param cnt.report            Reporting coverage - probability that contact was reported (\eqn{\epsilon})
-#' @param cnt.report.false      False reporting probability - probability that report was false (\eqn{\zeta})
-#' 
-#' @param est.cnt.invest.trans      Estimate \eqn{\eta}, default = TRUE
-#' @param est.cnt.invest.nontrans   Estimate \eqn{\lambda}, default = TRUE
-#' @param est.cnt.report            Estimate \eqn{\epsilon}, default = TRUE
-#' @param prior.cnt.eta.alpha       Beta distributed prior for \eqn{\eta}, \eqn{\alpha} parameter
-#' @param prior.cnt.eta.beta        Beta distributed prior for \eqn{\eta}, \eqn{\beta} parameter
-#' @param prior.cnt.epsilon.alpha   Beta distributed prior for \eqn{\epsilon}, \eqn{\alpha} parameter
-#' @param prior.cnt.epsilon.beta    Beta distributed prior for \eqn{\epsilon}, \eqn{\beta} parameter
-#' @param prior.cnt.lambda.alpha    Beta distributed prior for \eqn{\lambda}, \eqn{\alpha} parameter
-#' @param prior.cnt.lambda.beta     Beta distributed prior for \eqn{\lambda}, \eqn{\beta} parameter
+#' @param contact.coeff      Relative risk of contact on transmission. Vector must contain the same number
+#'                           of elements as there are contact routes (the length of the contact matrix list)
 #'  
 #' @export
 contact_parameters <- function(le,
-    cnt.invest.trans = 1, cnt.invest.nontrans = 0.5, cnt.report = 1, cnt.report.false = 0,
-    cnt.types = c(0.5, 0.5), est.cnt.types = T,
-    est.cnt.invest.trans = T, est.cnt.invest.nontrans = T, est.cnt.report = T,
-    prior.cnt.eta.alpha = 1, prior.cnt.eta.beta = 1,
-    prior.cnt.lambda.alpha = 1, prior.cnt.lambda.beta = 1,
-    prior.cnt.epsilon.alpha = 1, prior.cnt.epsilon.beta = 1){
+    contact.coeff = NA){
   
   # Dataslot
   le$dataslot$contact <- le$dataset$contact.matrix
   
+  if (is.na(contact.coeff)){
+    contact.coeff <- rep(1, length(le$dataset$contact.matrix) + 1)
+  } else if (length(contact.coeff != length(le$dataset$contact.matrix))){
+    stop("Contact coefficient vector should be the same length as the number of contact matrices")
+  } else {
+    contact.coeff <- c(1, contact.coeff)
+  }
+
   # Parameterslot
   le$parameterslot <- c(le$parameterslot, list(
     contact = TRUE,
-    cnt.eta = cnt.invest.trans,
-    cnt.lambda = cnt.invest.nontrans,
-    cnt.epsilon = cnt.report,
-    cnt.zeta = cnt.report.false,
-    cnt.types = cnt.types))
+    contact.coeff = contact.coeff))
  
   # Helperslot
   le$helperslot <- c(le$helperslot, list(
-    est.cnt.eta = est.cnt.invest.trans,
-    est.cnt.lambda = est.cnt.invest.nontrans,
-    est.cnt.epsilon = est.cnt.report,
-    cnt.eta.alpha = prior.cnt.eta.alpha,
-    cnt.eta.beta = prior.cnt.eta.beta,
-    cnt.l.alpha = prior.cnt.lambda.alpha,
-    cnt.l.beta = prior.cnt.lambda.beta,
-    cnt.e.alpha = prior.cnt.epsilon.alpha,
-    cnt.e.beta = prior.cnt.epsilon.beta,
-    est.cnt.types = est.cnt.types
+    est.cnt.coeff = est.cnt.coeff
   ))
   
   # Sampleslot
   le$sampleslot <- c(le$sampleslot, list(
-    cnt.eta = c(),
-    cnt.lambda = c(),
-    cnt.epsilon = c(),
-    cnt.zeta = c(),
-    cnt.types = matrix(NA, nrow = 2, ncol = 1)))
-  
+    contact.coeff = matrix(NA, 
+        nrow = length(le$dataset$contact.matrix), ncol = 1)))
   return(le)
 }
 
 contact_functions <- function(le){
   
   # calculate the log-likelihood of contacts
-  le$likelihoods[["logLikcontact"]] <- function(le){#infectors, cnt.matrix, cnt.invest.trans, cnt.invest.nontrans,
-                                          #cnt.rep, cnt.rep.false) {
+  le$likelihoods[["logLikcontact"]] <- function(le){
 
     lik <- with(le, {
-    #   if(is.null(d$contact)) return(0)
-      lik <- unlist(lapply(seq_len(dim(contactarray)[3]), function(i){
-        mat <- contactarray[,,i]
-        diag(mat) <- NA
-        mat <- mat #* p$cnt.types[i]
-        return(mat)
+    #   For each host
+      lik.host <- unlist(lapply(seq_len(dim(contactarray)[1]), function(i){
+        # For each contact route
+        lik.i <- unlist(lapply(seq_len(dim(contactarray)[3]), function(r){  
+          # Compute loglikelihood
+          if (v$infectors[i] != 0){
+            return(log(contact.coeff[1] + contact.coeff[r+1] * contactarray[v$infectors[i],i,r]))
+          } else {
+            return(0)
+          }
+        }))
+        return(sum(lik.i))
       }))
-      lik <- lik[!is.na(lik)]
 
-      # lik <- c()
-      # for(i in seq_len(ncol(d$contact))){
-      #   for(j in seq_len(ncol(d$contact))){
-      #     if (i != j){
-      #       if (v$infectors[j] == i){
-      #         #tau <- floor(v$inftimes[j])
-      #         if (d$contact[i,j] == 1){
-      #           lik <- c(lik, ((1-p$cnt.eta)*p$cnt.zeta + p$cnt.eta * p$cnt.epsilon)) # * contact.probs[categories[i], categories[j]])
-      #         } else{
-      #           lik <- c(lik, (1-p$cnt.eta)*(1-p$cnt.zeta) + p$cnt.eta*(1-p$cnt.epsilon)) #* (1-contact.probs[categories[i], categories[j]]))
-      #         }
-      #       } else if (v$infectors[i] == j){
-      #         #tau <- floor(v$inftimes[i])
-      #         if (d$contact[j,i] == 1){
-      #           lik <- c(lik, ((1-p$cnt.eta)*p$cnt.zeta + p$cnt.eta * p$cnt.epsilon)) #* contact.probs[categories[i], categories[j]])
-      #         } else{
-      #           lik <- c(lik, (1-p$cnt.eta)*(1-p$cnt.zeta) + p$cnt.eta*(1-p$cnt.epsilon)) #* (1-contact.probs[categories[i], categories[j]]))
-      #         }
-      #       } else {
-      #         if (d$contact[i,j] == 1){
-      #           lik <- c(lik, (1-p$cnt.lambda)*p$cnt.zeta + p$cnt.lambda * p$cnt.epsilon) #* contact.probs[categories[i], categories[j]])
-      #         } else {
-      #           lik <- c(lik, (1-p$cnt.lambda)*(1-p$cnt.zeta) + p$cnt.lambda * (1-p$cnt.epsilon)) #* (1-contact.probs[categories[i], categories[j]]))
-      #         }
-      #       }
-      #     }
-      #   }
-      # }
-      #if (any(lik == 0)) stop("zeros in likelihood")
-      #print(ifelse(is.infinite(sum(log(lik))), -1e5, sum(log(lik))))
-      return(ifelse(is.infinite(sum(log(lik))), -1e5, sum(log(lik))))
+      # For each contact route, compute loglikelihood part of contact risk: contact rel risk times proportion
+      lik.prop <- unlist(lapply(seq_len(dim(contactarray)[3]), function(r){
+        return(contact.coeff[r+1] * contact.prop[r] * length(v$infectors))
+      }))
+
+      return(sum(lik.host) - sum(lik.prop))
     })
     return(lik)
   }
 
-  le$updaters[["update_cnt_eta"]] <- function(){
+  le$updaters[["update_contact_coeff"]] <- function() {
     ### create an up-to-date proposal-environment
     prepare_pbe()
     
@@ -473,150 +426,30 @@ contact_functions <- function(le){
     h <- pbe0$h
     p <- pbe1$p
     v <- pbe1$v
-    
-    ### check whether to estimate
-    if(!h$est.cnt.eta) return()
-    
+
+    ### sample 1 of the coefficients
+    n <- sample(length(p$contact.coeff), 1)
+
     ### change to proposal state
-    p$cnt.eta <- rnorm(1, mean = p$cnt.eta, sd = 0.05)
-    
-    if (p$cnt.eta < 0 | p$cnt.eta > 1) return()
+    p$contact.coef[n] <- exp(log(p$contact.coeff[n]) + rnorm(1, 0, h$si.dist))
     
     ### update proposal environment
     copy2pbe1("p", le)
     
     ### calculate proposalratio
-    logproposalratio <- log(p$cnt.eta) - log(pbe0$p$cnt.eta)
+    logproposalratio <- log(p$contact.coef[n]) - log(pbe0$p$contact.coef[n])
     
     ### calculate likelihood
-    propose_pbe("contact")
+    propose_pbe("contact.coeff")
     
     ### calculate acceptance probability
-    logaccprob <- pbe1$logLikcontact - pbe0$logLikcontact + logproposalratio +
-      dbeta(pbe1$p$cnt.eta, shape1 = h$cnt.eta.alpha, shape2 = h$cnt.eta.beta, log = TRUE) - 
-      dbeta(pbe0$p$cnt.eta, shape1 = h$cnt.eta.alpha, shape2 = h$cnt.eta.beta, log = TRUE)
-      
-    ### accept or reject
-    if (runif(1) < exp(logaccprob)) {
-      accept_pbe("contact")
-    }
-  }
-
-  # update parameters of loglik of contacts
-  le$updaters[["update_cnt_lambda"]] <- function(){
-    ### create an up-to-date proposal-environment
-    prepare_pbe()
-    
-    ### making variables and parameters available within the function
-    le <- environment()
-    h <- pbe0$h
-    p <- pbe1$p
-    v <- pbe1$v
-    
-    ### check whether to estimate
-    if(!h$est.cnt.lambda) return()
-    
-    ### change to proposal state
-    p$cnt.lambda <- rnorm(1, mean = p$cnt.lambda, sd = 0.05)
-    
-    if (p$cnt.lambda < 0 | p$cnt.lambda > 1) return()
-    
-    ### update proposal environment
-    copy2pbe1("p", le)
-    
-    ### calculate proposalratio
-    logproposalratio <- log(p$cnt.lambda) - log(pbe0$p$cnt.lambda)
-    
-    ### calculate likelihood
-    propose_pbe("contact")
-    
-    ### calculate acceptance probability
-    logaccprob <- pbe1$logLikcontact - pbe0$logLikcontact + logproposalratio +
-      dbeta(pbe1$p$cnt.lambda, shape1 = h$cnt.l.alpha, shape2 = h$cnt.l.beta, log = TRUE) - 
-      dbeta(pbe0$p$cnt.lambda, shape1 = h$cnt.l.alpha, shape2 = h$cnt.l.beta, log = TRUE)
-
-    ### accept or reject
-    if (runif(1) < exp(logaccprob)) {
-      accept_pbe("contact")
-    }
-  }
-  
-  le$updaters[["update_cnt_epsilon"]] <- function(){
-    ### create an up-to-date proposal-environment
-    prepare_pbe()
-    
-    ### making variables and parameters available within the function
-    le <- environment()
-    h <- pbe0$h
-    p <- pbe1$p
-    v <- pbe1$v
-    
-    ### check whether to estimate
-    if(!h$est.cnt.epsilon) return()
-    
-    ### change to proposal state
-    p$cnt.epsilon <- rnorm(1, mean = p$cnt.epsilon, sd = 0.05)
-    
-    if (p$cnt.epsilon < 0 | p$cnt.epsilon > 1) return()
-    
-    ### update proposal environment
-    copy2pbe1("p", le)
-    
-    ### calculate proposalratio
-    logproposalratio <- log(p$cnt.epsilon) - log(pbe0$p$cnt.epsilon)
-    
-    ### calculate likelihood
-    propose_pbe("contact")
-    
-    ### calculate acceptance probability
-    logaccprob <- pbe1$logLikcontact - pbe0$logLikcontact + logproposalratio +
-      dbeta(pbe1$p$cnt.epsilon, shape1 = h$cnt.e.alpha, shape2 = h$cnt.e.beta, log = TRUE) - 
-      dbeta(pbe0$p$cnt.epsilon, shape1 = h$cnt.e.alpha, shape2 = h$cnt.e.beta, log = TRUE)
-    
+    logaccprob <- pbe1$logLikcontact - pbe0$logLikcontact + logproposalratio
     
     ### accept or reject
     if (runif(1) < exp(logaccprob)) {
-      accept_pbe("contact")
+      accept_pbe("contact.coeff")
     }
   }
-
-  # le$updaters[["update_cnt_types"]] <- function(){
-  #   prepare_pbe()
-
-  #   ### making variables and parameters available within the function
-  #   le <- environment()
-  #   h <- pbe0$h
-  #   p <- pbe1$p
-  #   v <- pbe1$v
-
-  #   ### change to proposal state
-  #   p$cnt.type.1 <- rnorm(1, mean = p$cnt.types[1], sd = 0.05)
-    
-  #   if (p$cnt.epsilon < 0 | p$cnt.epsilon > 1){ 
-  #     return()
-  #   } else {
-  #     p$cnt.types <- c(p$cnt.type.1, 1 - p$cnt.type.1)
-  #   }
-
-  #   ### update proposal environment
-  #   copy2pbe1("p", le)
-    
-  #   ### calculate proposalratio
-  #   logproposalratio <- sum(log(p$cnt.types)) - sum(log(pbe0$p$cnt.types))
-    
-  #   ### calculate likelihood
-  #   propose_pbe("contact")
-    
-  #   ### calculate acceptance probability
-  #   logaccprob <- pbe1$logLikcontact - pbe0$logLikcontact + logproposalratio
-    
-  #   ### accept or reject
-  #   if (runif(1) < exp(logaccprob)) {
-  #     accept_pbe("contact")
-  #   }
-  # }
-
-  return(le)
 }
 
 #####
