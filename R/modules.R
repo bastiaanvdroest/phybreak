@@ -389,13 +389,24 @@ spatial_functions <- function(le){
 #'  
 #' @export
 contact_parameters <- function(le,
-    contact.coeff = NA){
+    contact.coeff = NA, est.cnt.coeff = T){
   
   # Dataslot
   le$dataslot$contact <- le$dataset$contact.matrix
   
   if (is.na(contact.coeff)){
-    contact.coeff <- rep(1, length(le$dataset$contact.matrix) + 1)
+    if (inherits(le$dataset$contact.matrix, "matrix")){
+      contact.coeff <- rep(1, 1)
+      contact.prop <- sum(colSums(le$dataset$contact.matrix)) / 
+        ncol(le$dataset$contact.matrix)^2
+    } else if (inherits(le$dataset$contact.matrix, "list")){
+      contact.coeff <- rep(1, length(le$dataset$contact.matrix))
+      contact.prop <- do.call(c, lapply(le$dataset$contact.matrix, function(m){
+        return(sum(colSums(m)) / ncol(m)^2)
+      }))
+    } else {
+      stop("Provide either a contact matrix or a list of contact matrices")
+    }    
   } else if (length(contact.coeff != length(le$dataset$contact.matrix))){
     stop("Contact coefficient vector should be the same length as the number of contact matrices")
   } else {
@@ -405,7 +416,8 @@ contact_parameters <- function(le,
   # Parameterslot
   le$parameterslot <- c(le$parameterslot, list(
     contact = TRUE,
-    contact.coeff = contact.coeff))
+    contact.coeff = contact.coeff),
+    contact.prop = contact.prop)
  
   # Helperslot
   le$helperslot <- c(le$helperslot, list(
@@ -414,8 +426,7 @@ contact_parameters <- function(le,
   
   # Sampleslot
   le$sampleslot <- c(le$sampleslot, list(
-    contact.coeff = matrix(NA, 
-        nrow = length(le$dataset$contact.matrix), ncol = 1)))
+    contact.coeff = NULL))
   return(le)
 }
 
@@ -425,26 +436,28 @@ contact_functions <- function(le){
   le$likelihoods[["logLikcontact"]] <- function(le){
 
     lik <- with(le, {
-    #   For each host
+      # Calculate c0 from MLE
+      c0 <- (length(v$infectors) - sum(v$infectors == 0)) / length(v$infectors)
+      #   For each host
       lik.host <- unlist(lapply(seq_len(dim(contactarray)[1]), function(i){
         # For each contact route
         lik.i <- unlist(lapply(seq_len(dim(contactarray)[3]), function(r){  
           # Compute loglikelihood
           if (v$infectors[i] != 0){
-            return(log(contact.coeff[1] + contact.coeff[r+1] * contactarray[v$infectors[i],i,r]))
+            return(p$contact.coeff[r] * contactarray[v$infectors[i],i,r])
           } else {
             return(0)
           }
         }))
-        return(sum(lik.i))
+        return(log(c0 + sum(lik.i)))
       }))
-
+      
       # For each contact route, compute loglikelihood part of contact risk: contact rel risk times proportion
       lik.prop <- unlist(lapply(seq_len(dim(contactarray)[3]), function(r){
-        return(contact.coeff[r+1] * contact.prop[r] * length(v$infectors))
+        return(p$contact.coeff[r] * p$contact.prop[r])
       }))
 
-      return(sum(lik.host) - sum(lik.prop))
+      return(sum(lik.host) - (c0 + sum(lik.prop) * length(v$infectors)))
     })
     return(lik)
   }
@@ -456,15 +469,15 @@ contact_functions <- function(le){
     ### making variables and parameters available within the function
     le <- environment()
     h <- pbe0$h
-    p <- pbe1$p
-    v <- pbe1$v
+    p <- pbe0$p
 
     ### sample 1 of the coefficients
     n <- sample(length(p$contact.coeff), 1)
 
     ### change to proposal state
-    p$contact.coef[n] <- exp(log(p$contact.coeff[n]) + rnorm(1, 0, h$si.dist))
-    
+    coeff.new <- exp(log(p$contact.coeff[n]) + rnorm(1, 0, 1))
+    p$contact.coeff[n] <- coeff.new
+
     ### update proposal environment
     copy2pbe1("p", le)
     
@@ -482,6 +495,8 @@ contact_functions <- function(le){
       accept_pbe("contact.coeff")
     }
   }
+
+  return(le)
 }
 
 #####

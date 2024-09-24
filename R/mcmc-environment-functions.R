@@ -108,25 +108,27 @@ build_pbe <- function(phybreak.obj) {
   .likseqenv(le, (d$nsamples + 1):(2 * d$nsamples - 1), 1:d$nsamples)
   
   ### initialize all dimensions of contactarray
-  if (inherits(d$contact, "matrix")){
-    contactarray <- array(1, dim = c(ncol(d$contact), nrow(d$contact), 1))
-  } else {
-    contactarray <- array(1, dim = c(length(unique(d$hostnames)), 
-                                   length(unique(d$hostnames)),
-                                   length(d$contact)))
+  if (!is.null(d$contact)){
+    if (inherits(d$contact, "matrix")){
+      contactarray <- array(d$contact, dim = c(ncol(d$contact), nrow(d$contact), 1))
+    } else {
+      contactarray <- array(unlist(d$contact), dim = c(length(unique(d$hostnames)), 
+                                    length(unique(d$hostnames)),
+                                    length(d$contact)))
+    }
+    copy2pbe0("contactarray", le)
   }
 
-  if (p$contact){
-    ### initialize contact array with initial transmission tree
-    for (i in seq_len(dim(contactarray)[3])){
-      for(host_i in seq_len(ncol(contactarray[,,i]))){
-        for(host_j in seq_len(ncol(contactarray[,,i]))){
-          contactarray[host_i,host_j,i] <- phybreak:::get_contact_probability(d$contact, host_i, host_j, le)
-        }
-      }
-    }
-  }
-  copy2pbe0("contactarray", le)
+  # if (p$contact){
+  #   ### initialize contact array with initial transmission tree
+  #   for (i in seq_len(dim(contactarray)[3])){
+  #     for(host_i in seq_len(ncol(contactarray[,,i]))){
+  #       for(host_j in seq_len(ncol(contactarray[,,i]))){
+  #         contactarray[host_i,host_j,i] <- phybreak:::get_contact_probability(contactarray[,,i], host_i, host_j, le)
+  #       }
+  #     }
+  #   }
+  # }
 
 
   ### calculate the other log-likelihoods
@@ -140,7 +142,7 @@ build_pbe <- function(phybreak.obj) {
       copy2pbe0(n, le)
     }
   }
-  
+  print(logLikgen)
   # logLikdist <- lik_distances(p$dist.model, p$dist.exponent, p$dist.scale, p$dist.mean, 
   #                             v$infectors, d$distances, d$area)
   # logLikcontact <- lik_contact(v$infectors, d$contact.matrix, p$cnt.invest.trans, p$cnt.invest.nontrans,
@@ -224,25 +226,25 @@ propose_pbe <- function(f) {
   if (!is.null(chnodes)) {
     .likseqenv(pbe1, chnodes, nodetips)
 
-    if (p$contact == TRUE){
-      chhosts <- which(v$infectors != pbe0$v$infectors)
-      if (length(chhosts) > 0){
-        if (length(chhosts) > 1){
-          host.pairs <- combn(chhosts[chhosts <= ncol(d$contact)], m=2)
-        } else if (length(chhosts) == 1){
-          host.pairs <- t(t(c(v$infectors[chhosts], chhosts)))
-        }
-        if (!(0 %in% host.pairs)){
-          for (i in seq_len(ncol(host.pairs))){
-            for (array_i in seq_len(dim(contactarray)[3])){
-              contactarray[host.pairs[1,i],host.pairs[2,i],array_i] <- 
-              get_contact_probability(contactarray[,,array_i], host.pairs[1,i], host.pairs[2,i], le)
-            }
-          }
-        }
-      }
-      copy2pbe1("contactarray", le)
-    }
+    # if (p$contact == TRUE){
+    #   chhosts <- which(v$infectors != pbe0$v$infectors)
+    #   if (length(chhosts) > 0){
+    #     if (length(chhosts) > 1){
+    #       host.pairs <- combn(chhosts[chhosts <= ncol(d$contact)], m=2)
+    #     } else if (length(chhosts) == 1){
+    #       host.pairs <- t(t(c(v$infectors[chhosts], chhosts)))
+    #     }
+    #     if (!(0 %in% host.pairs)){
+    #       for (i in seq_len(ncol(host.pairs))){
+    #         for (array_i in seq_len(dim(contactarray)[3])){
+    #           contactarray[host.pairs[1,i],host.pairs[2,i],array_i] <- 
+    #           get_contact_probability(contactarray[,,array_i], host.pairs[1,i], host.pairs[2,i], le)
+    #         }
+    #       }
+    #     }
+    #   }
+    #   copy2pbe1("contactarray", le)
+    # }
   }
   
   if (f == "phylotrans" || f == "trans" || f == "mG" || f == "ir" || f == "R") {
@@ -260,17 +262,17 @@ propose_pbe <- function(f) {
     copy2pbe1("logLikcoal", le)
   }
   
-  if (f == "contact"){
-    for (array_i in seq_len(dim(contactarray)[3])){
-      for(host_i in seq_len(dim(contactarray)[1])){
-        for(host_j in seq_len(dim(contactarray)[2])){
-          if (dim(contactarray)[3] == 1) contactarray[host_i,host_j,array_i] <- get_contact_probability(d$contact, host_i, host_j, le)
-          else contactarray[host_i,host_j,array_i] <- get_contact_probability(d$contact[[array_i]], host_i, host_j, le)
-        }
-      }
-    }
-    copy2pbe1("contactarray", le)
-  }
+  # if (f == "contact"){
+  #   for (array_i in seq_len(dim(contactarray)[3])){
+  #     for(host_i in seq_len(dim(contactarray)[1])){
+  #       for(host_j in seq_len(dim(contactarray)[2])){
+  #         if (dim(contactarray)[3] == 1) contactarray[host_i,host_j,array_i] <- get_contact_probability(d$contact, host_i, host_j, le)
+  #         else contactarray[host_i,host_j,array_i] <- get_contact_probability(d$contact[[array_i]], host_i, host_j, le)
+  #       }
+  #     }
+  #   }
+  #   copy2pbe1("contactarray", le)
+  # }
 
   logLiks <- names(pbe0)[grepl("logLik", names(pbe0))]
   if (length(setdiff(logLiks, c("logLikseq", "logLikcoal", "logLiksam", "logLikgen"))) > 0){

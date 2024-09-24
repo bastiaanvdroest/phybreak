@@ -120,8 +120,8 @@ sample_phybreak <- function(x, nsample, thin = 1, thinswap = 1, classic = 0, kee
   
   ### create room for additional parameters from modules
   s.post.modules <- lapply(setdiff(names(x$s), names(s.post)), function(n){
-    if(n == "cnt.types"){
-      with(x, cbind(s$cnt.types, matrix(NA, nrow = 2, ncol = nsample - 1)))
+    if(n == "contact.coeff"){
+      with(x, cbind(s$contact.coeff, matrix(NA, nrow = length(x$p$contact.prop), ncol = nsample)))
     } else{
       return(c(x$s[[n]], rep(NA, nsample)))
     }
@@ -260,7 +260,7 @@ sample_phybreak <- function(x, nsample, thin = 1, thinswap = 1, classic = 0, kee
       
       if(length(s.post) > 14){
         for(n in setdiff(names(s.post)[15:length(names(s.post))], "chain")){
-          if (n == "cnt.types"){
+          if (n == "contact.coeff"){
             s.post[[n]][,sa] <- pbe0$p[[n]]
           } else {
             s.post[[n]][sa]<- pbe0$p[[n]]
@@ -283,7 +283,7 @@ sample_phybreak <- function(x, nsample, thin = 1, thinswap = 1, classic = 0, kee
       
     })
   }
-  
+
   s.posts <- lapply(1:length(heats), function(nheat){
     s <- s.post
     for (chain in 1:nchains){
