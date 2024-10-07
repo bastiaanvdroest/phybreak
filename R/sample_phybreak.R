@@ -115,12 +115,13 @@ sample_phybreak <- function(x, nsample, thin = 1, thinswap = 1, classic = 0, kee
                  wh.s = c(x$s$wh.s, rep(NA, nsample)), 
                  wh.e = c(x$s$wh.e, rep(NA, nsample)), 
                  wh.0 = c(x$s$wh.0, rep(NA, nsample)),
+                 r = c(x$s$r, rep(NA, nsample)),
                  logLik = c(x$s$logLik, rep(NA, nsample)),
                  heat = c(x$s$heat, rep(NA, nsample)))
   
   ### create room for additional parameters from modules
   s.post.modules <- lapply(setdiff(names(x$s), names(s.post)), function(n){
-    if(n == "contact.coeff"){
+    if(n == "contact.coeff" || n == "contact.prop"){
       with(x, cbind(s$contact.coeff, matrix(NA, nrow = length(x$p$contact.prop), ncol = nsample)))
     } else{
       return(c(x$s[[n]], rep(NA, nsample)))
@@ -201,7 +202,8 @@ sample_phybreak <- function(x, nsample, thin = 1, thinswap = 1, classic = 0, kee
           if (i == -4 && x$h$est.wh.s)  update_wh_slope()
           if (i == -5 && x$h$est.wh.e)  update_wh_exponent()
           if (i == -6 && x$h$est.wh.0)  update_wh_level()
-          if (i < -6)  x$updaters[[-6 - i]]()
+          if (i == -7 && x$h$est.r)  update_reproduction()
+          if (i < -7)  x$updaters[[-7 - i]]()
           
           # if (i == -7 && x$h$est.wh.h) update_wh_history()
           # if (i == -8 && x$h$est.dist.e)  update_dist_exponent()
@@ -248,19 +250,18 @@ sample_phybreak <- function(x, nsample, thin = 1, thinswap = 1, classic = 0, kee
       s.post$nodeparents[, sa] <- vars_to_log$nodeparents
       s.post$introductions[sa] <- sum(vars_to_log$infectors == 0)
       s.post$mu[sa] <- pbe0$p$mu
-      #s.post$hist_dens[sa] <- pbe0$h$dist[1]
-      #s.post$hist.mean[sa] <- pbe0$p$hist.mean
       s.post$mG[sa] <- pbe0$p$gen.mean
       s.post$mS[sa] <- pbe0$p$sample.mean
       s.post$wh.s[sa] <- pbe0$p$wh.slope
       s.post$wh.e[sa] <- pbe0$p$wh.exponent
       s.post$wh.0[sa] <- pbe0$p$wh.level
+      s.post$r[sa] <- pbe0$p$R
       s.post$logLik[sa] <- sum(sapply(names(pbe0)[grepl("logLik", names(pbe0))], function(n) pbe0[[n]]))
       s.post$heat[sa] <- pbe0$heat
       
-      if(length(s.post) > 14){
-        for(n in setdiff(names(s.post)[15:length(names(s.post))], "chain")){
-          if (n == "contact.coeff"){
+      if(length(s.post) > 15){
+        for(n in setdiff(names(s.post)[16:length(names(s.post))], "chain")){
+          if (n == "contact.coeff" || n == "contact.prop"){
             s.post[[n]][,sa] <- pbe0$p[[n]]
           } else {
             s.post[[n]][sa]<- pbe0$p[[n]]

@@ -142,7 +142,7 @@ build_pbe <- function(phybreak.obj) {
       copy2pbe0(n, le)
     }
   }
-  print(logLikgen)
+  
   # logLikdist <- lik_distances(p$dist.model, p$dist.exponent, p$dist.scale, p$dist.mean, 
   #                             v$infectors, d$distances, d$area)
   # logLikcontact <- lik_contact(v$infectors, d$contact.matrix, p$cnt.invest.trans, p$cnt.invest.nontrans,
@@ -311,7 +311,7 @@ accept_pbe <- function(f) {
     copy2pbe0("v", pbe1)
   }
   
-  if(f == "mG" || f == "mS" || f == "mu" || f == "ir" || 
+  if(f == "mG" || f == "mS" || f == "mu" || f == "ir" || f == "R" ||
      f == "wh.slope" || f == "wh.exponent" || f == "wh.level" || f == "wh.history" ||
      f == "dist.exponent" || f == "dist.scale" || f == "dist.mean") {
     copy2pbe0("p", pbe1)
@@ -326,7 +326,7 @@ accept_pbe <- function(f) {
     copy2pbe0("logLiksam", pbe1)
   }
   
-  if(f == "phylotrans" || f == "trans" || f == "mG" || f == "ir") {
+  if(f == "phylotrans" || f == "trans" || f == "mG" || f == "ir" || f == "R") {
     copy2pbe0("logLikgen", pbe1)
   }
   

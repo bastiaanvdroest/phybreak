@@ -89,7 +89,7 @@ lik_gentimes <- function(le){
     return(L)
   else {
     if (!p$contact){
-      L <- L + sum(othercases) * (log(sum(othercases)) - log(length(v$infectors)) - 1)
+      L <- L + sum(othercases) * log(R) - R * length(v$infectors)
     }
     return( L +
              sum(infect_distribution(time = v$inftimes[othercases],

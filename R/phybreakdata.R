@@ -257,26 +257,38 @@ phybreakdata <- function(sequences, sample.times, spatial = NULL, contact = NULL
   ### Conctact data ###
   
   if(!is.null(contact)){
-    if(!inherits(contact, "matrix") || !is.numeric(contact))
-      stop("\"contact\" should be a numeric matrix")
-    if(nrow(contact) != ncol(contact))
-      stop("\"contact\" should be a square matrix of same size as number of hosts")
-    if(nrow(contact) != length(allhosts)) {
-      stop("size of \"contact\" does not correspond to number of hosts")
-    }
-    if(is.null(rownames(contact)) || is.null(colnames(contact))) {
-      warning("\"contact\" data do not contain names; names are assigned")
-      rownames(contact) <- allhosts
-      colnames(contact) <- allhosts
-    }
-    if (all(names(removal.times) %in% orderedhosts)) {
-      contact <- contact[match(rownames(contact), orderedhosts),match(rownames(contact), orderedhosts)]
+    if(!inherits(contact, 'list'))
+      contact <- list(contact)
+    if(!all(sapply(contact, inherits, c('matrix', 'numeric'))))
+      stop("\"contact\" should be a numeric matrix or a list of numeric matrices")
+    
+    contact <- lapply(contact, function(contact.mat){
+      if(nrow(contact.mat) != ncol(contact.mat))
+        stop("\"contact\" should be a square matrix of same size as number of hosts")
+      if(nrow(contact.mat) != length(allhosts)) {
+        stop("size of \"contact\" does not correspond to number of hosts")
+      }
+      if(is.null(rownames(contact.mat)) || is.null(colnames(contact.mat))) {
+        warning("\"contact\" data do not contain names; names are assigned")
+        rownames(contact.mat) <- allhosts
+        colnames(contact.mat) <- allhosts
+      }
+      if (all(rownames(contact.mat) %in% orderedhosts)) {
+        contact.mat <- contact.mat[match(rownames(contact.mat), orderedhosts),match(rownames(contact.mat), orderedhosts)]
+      } else {
+        warning("names in contact don't match host.names and are therefore overwritten")
+        contact.mat <- contact.mat[match(rownames(contact.mat), orderedhosts),match(rownames(contact.mat), orderedhosts)]
+        rownames(contact.mat) <- colnames(contact.mat) <- orderedhosts
+      }
+      return(contact.mat)
+    })
+
+    if (length(contact) == 1){
+      res <- c(res, list(contact.matrix = contact[[1]]))
     } else {
-      warning("names in contact don't match host.names and are therefore overwritten")
-      contact <- contact[match(rownames(contact), orderedhosts),match(rownames(contact), orderedhosts)]
-      rownames(contact) <- colnames(contact) <- orderedhosts
+      res <- c(res, list(contact.matrix = contact))
     }
-    res <- c(res, list(contact.matrix = contact))
+ 
   }
   
   ### infection times ###

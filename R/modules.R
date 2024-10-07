@@ -58,7 +58,6 @@ introductions_parameters <- function(le, introductions = 1,
   le$parameterslot <- c(le$parameterslot, list(
     introductions = introductions,
     intro.rate = intro.rate,
-    R = reproduction.rate,
     mult.intro = TRUE,
     use.NJtree = use.NJtree,
     wh.history = wh.history))
@@ -67,7 +66,6 @@ introductions_parameters <- function(le, introductions = 1,
   le$helperslot <- c(le$helperslot, list(
     si.ir = 2.38*sqrt(trigamma(introductions)),
     est.ir = est.intro.rate,
-    est.R = est.reproduction,
     est.wh.h = est.wh.history,
     ir.av = prior.intro.rate.mean,
     ir.sh = prior.intro.rate.shape,
@@ -78,8 +76,7 @@ introductions_parameters <- function(le, introductions = 1,
   le$sampleslot <- c(le$sampleslot, list(
     introductions = c(),
     intro.rate = c(),
-    wh.history = c(),
-    R = c()))
+    wh.history = c()))
   
   return(le)
 }
@@ -122,6 +119,7 @@ introductions_functions <- function(le){
       accept_pbe("wh.history")
     }
   }
+
   le$updaters[["update_ir"]] <- function() {
     ### create an up-to-date proposal-environment
     prepare_pbe()
@@ -157,39 +155,6 @@ introductions_functions <- function(le){
     }
   }
 
-  le$updaters[["update_R"]] <- function(){
-     ### create an up-to-date proposal-environment
-    prepare_pbe()
-    
-    ### making variables and parameters available within the function
-    le <- environment()
-    h <- pbe0$h
-    p <- pbe1$p
-    v <- pbe1$v
-    
-    ### check whether to estimate
-    if(!h$est.ir) return()
-    
-    p$R <- exp(log(p$R) + rnorm(1, 0, h$si.ir))
-    
-    ### update proposal environment
-    copy2pbe1("p", le)
-    
-    ### calculate proposalratio
-    logproposalratio <- log(p$R) - log(pbe0$p$R)
-    
-    ### calculate likelihood
-    propose_pbe("R")
-    
-    ### calculate acceptance probability
-    logaccprob <- pbe1$logLikgen - pbe0$logLikgen + logproposalratio
-    
-    ### accept
-    if (runif(1) < exp(logaccprob)) {
-      accept_pbe("R")
-    }
-  }
-  
   return(le)
 }
 
@@ -389,14 +354,14 @@ spatial_functions <- function(le){
 #'  
 #' @export
 contact_parameters <- function(le,
-    contact.coeff = NA, est.cnt.coeff = T){
+    contact.coeff = NA, est.cnt.coeff = T, est.cnt.prop = T){
   
   # Dataslot
   le$dataslot$contact <- le$dataset$contact.matrix
   
   if (is.na(contact.coeff)){
     if (inherits(le$dataset$contact.matrix, "matrix")){
-      contact.coeff <- rep(1, 1)
+      contact.coeff <- 1
       contact.prop <- sum(colSums(le$dataset$contact.matrix)) / 
         ncol(le$dataset$contact.matrix)^2
     } else if (inherits(le$dataset$contact.matrix, "list")){
@@ -409,24 +374,24 @@ contact_parameters <- function(le,
     }    
   } else if (length(contact.coeff != length(le$dataset$contact.matrix))){
     stop("Contact coefficient vector should be the same length as the number of contact matrices")
-  } else {
-    contact.coeff <- c(1, contact.coeff)
   }
-
+  
   # Parameterslot
   le$parameterslot <- c(le$parameterslot, list(
     contact = TRUE,
-    contact.coeff = contact.coeff),
-    contact.prop = contact.prop)
- 
+    contact.coeff = contact.coeff,
+    contact.prop = contact.prop))
+  
   # Helperslot
   le$helperslot <- c(le$helperslot, list(
-    est.cnt.coeff = est.cnt.coeff
+    est.cnt.coeff = est.cnt.coeff,
+    est.cnt.prop = est.cnt.prop
   ))
   
   # Sampleslot
   le$sampleslot <- c(le$sampleslot, list(
-    contact.coeff = NULL))
+    contact.coeff = NULL,
+    contact.prop = NULL))
   return(le)
 }
 
@@ -435,9 +400,9 @@ contact_functions <- function(le){
   # calculate the log-likelihood of contacts
   le$likelihoods[["logLikcontact"]] <- function(le){
 
-    lik <- with(le, {
-      # Calculate c0 from MLE
-      c0 <- (length(v$infectors) - sum(v$infectors == 0)) / length(v$infectors)
+    # Likelihood for contact coefficients
+    lik.coeff <- with(le, {
+      c0 <- p$R
       #   For each host
       lik.host <- unlist(lapply(seq_len(dim(contactarray)[1]), function(i){
         # For each contact route
@@ -453,13 +418,34 @@ contact_functions <- function(le){
       }))
       
       # For each contact route, compute loglikelihood part of contact risk: contact rel risk times proportion
-      lik.prop <- unlist(lapply(seq_len(dim(contactarray)[3]), function(r){
+      lik.routes <- unlist(lapply(seq_len(dim(contactarray)[3]), function(r){
         return(p$contact.coeff[r] * p$contact.prop[r])
       }))
 
-      return(sum(lik.host) - (c0 + sum(lik.prop) * length(v$infectors)))
+      return(sum(lik.host) - (c0 + sum(lik.routes)) * length(v$infectors))
     })
-    return(lik)
+
+    # Likelihood for contact proportions
+    lik.prop <- with(le, {
+      total <- length(v$infectors)
+      othercases <- sum(v$infectors != 0)
+      non_transmission <- total * (total - 1)/2 - othercases
+
+      lik.routes <- unlist(lapply(seq_len(dim(contactarray)[3]), function(r){
+        all <- sum(contactarray[,,r])
+        trans <- 0
+        for (i in seq_along(v$infectors)){
+          if (v$infectors[i] != 0){
+            trans <- trans + contactarray[i,v$infectors[i],r]
+          }
+        }
+        contacts <- all - trans
+        return(contacts * log(p$contact.prop[r]) + (non_transmission - contacts) * log(1-p$contact.prop[r]))
+      }))
+
+      return(sum(lik.routes))
+    })
+    return(lik.coeff + lik.prop)
   }
 
   le$updaters[["update_contact_coeff"]] <- function() {
@@ -482,7 +468,7 @@ contact_functions <- function(le){
     copy2pbe1("p", le)
     
     ### calculate proposalratio
-    logproposalratio <- log(p$contact.coef[n]) - log(pbe0$p$contact.coef[n])
+    logproposalratio <- log(p$contact.coeff[n]) - log(pbe0$p$contact.coeff[n])
     
     ### calculate likelihood
     propose_pbe("contact.coeff")
@@ -493,6 +479,47 @@ contact_functions <- function(le){
     ### accept or reject
     if (runif(1) < exp(logaccprob)) {
       accept_pbe("contact.coeff")
+    }
+  }
+
+  le$updaters[["update_contact_prop"]] <- function() {
+    ### create an up-to-date proposal-environment
+    prepare_pbe()
+    
+    ### making variables and parameters available within the function
+    le <- environment()
+    h <- pbe0$h
+    p <- pbe0$p
+
+    ### check whether to update
+    if (!h$est.cnt.prop)
+      return()
+
+    ### sample 1 of the coefficients
+    n <- sample(length(p$contact.prop), 1)
+
+    ### change to proposal state
+    prop.new <- exp(log(p$contact.prop[n]) + rnorm(1, 0, 1))
+    if (prop.new < 0 || prop.new >= 1)
+      return()
+
+    p$contact.prop[n] <- prop.new
+
+    ### update proposal environment
+    copy2pbe1("p", le)
+    
+    ### calculate proposalratio
+    logproposalratio <- log(p$contact.prop[n]) - log(pbe0$p$contact.prop[n])
+    
+    ### calculate likelihood
+    propose_pbe("contact.prop")
+    
+    ### calculate acceptance probability
+    logaccprob <- pbe1$logLikcontact - pbe0$logLikcontact + logproposalratio
+    
+    ### accept or reject
+    if (runif(1) < exp(logaccprob)) {
+      accept_pbe("contact.prop")
     }
   }
 

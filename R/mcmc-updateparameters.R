@@ -190,6 +190,41 @@ update_wh_level <- function() {
   }
 }
 
+update_reproduction <- function(){
+     ### create an up-to-date proposal-environment
+    prepare_pbe()
+    
+    ### making variables and parameters available within the function
+    le <- environment()
+    h <- pbe0$h
+    p <- pbe0$p
+    v <- pbe1$v
+    
+    p$R <- exp(log(p$R) + rnorm(1, 0, h$si.r))
+    ### update proposal environment
+    copy2pbe1("p", le)
+    
+    ### calculate proposalratio
+    logproposalratio <- log(p$R) - log(pbe0$p$R)
+    
+    ### calculate likelihood
+    propose_pbe("R")
+
+    ### calculate acceptance probability
+    if (p$contact)
+      logaccprob <- pbe1$logLikcontact - pbe0$logLikcontact + logproposalratio
+    else 
+      logaccprob <- pbe1$logLikgen - pbe0$logLikgen + logproposalratio
+    
+    ### accept
+    if (runif(1) < exp(logaccprob)) {
+      if (p$contact) 
+        accept_pbe("contact")
+      else 
+        accept_pbe("R")
+    }
+  }
+
 # update_ir <- function() {
 #   ### create an up-to-date proposal-environment
 #   prepare_pbe()

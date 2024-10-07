@@ -59,14 +59,14 @@
 #' @export
 sim_phybreak <- function(obsize = 50, popsize = NA, samplesperhost = 1,
                          introductions = 1, intro.rate = 1, outbreak.duration = 10,
-                         R0 = 1.5, spatial = FALSE, contact = FALSE, contact.symmetric = TRUE, contact.probs = 1,
+                         R0 = 1.5, spatial = FALSE, contact = FALSE,
                          gen.shape = 10, gen.mean = 1, 
                          sample.shape = 10, sample.mean = 1,
                          additionalsampledelay = 0,
                          wh.model = "linear", wh.bottleneck = "auto", wh.slope = 1, wh.exponent = 1, wh.level = 0.1,
                          wh.history = 100,
                          dist.model = "power", dist.exponent = 2, dist.scale = 1,
-                         cnt.invest.trans = 1, cnt.invest.nontrans = 0.1, cnt.rep = 0.9, cnt.rep.false = 0,
+                         contact.types = 1, contact.prob.trans = 0.5, contact.prop = 0.5,
                          mu = 0.0001, sequence.length = 10000, ...) {
   
   ### parameter name compatibility 
@@ -93,6 +93,31 @@ sim_phybreak <- function(obsize = 50, popsize = NA, samplesperhost = 1,
   }
   if(any(c(gen.shape, gen.mean, sample.shape, sample.mean, wh.slope, mu) <= 0)) {
     stop("parameter values should be positive")
+  }
+  if(contact){
+    if(length(contact.prob.trans) != contact.types || length(contact.prop) != contact.types)
+      stop("length of contact parameters should equal number of contact types")
+    
+    # Convert contact.prop.trans into contact.coeff
+    neq <- length(contact.prob.trans)
+    # Initialize coefficient matrix A and the constant vector B
+    A <- matrix(0, nrow = neq, ncol = neq)  # Coefficient matrix
+    rhs <- numeric(neq)                    # Right-hand side vector
+
+    # Fill the coefficient matrix A and right-hand side vector
+    for (i in 1:neq) {
+      # Fill in the coefficient matrix A
+      A[i, i] <- contact.prop[i] * (1 - contact.prob.trans[i])
+      
+      # Compute the right-hand side
+      rhs[i] <- contact.prob.trans[i] * (R0 + sum(contact.prop * contact.prob.trans))
+    }
+
+    # Solve the linear system A * x = B for x (where x is the vector [a1, a2, ... an])
+    contact.coeff <- solve(A, rhs)
+    print(contact.coeff)
+    
+    #R0 <- R0 + sum(contact.coeff * contact.prop)
   }
   wh.model <- choose_whmodel(wh.model)
   wh.bottleneck <- choose_whbottleneck(wh.bottleneck, wh.model)
@@ -123,9 +148,12 @@ sim_phybreak <- function(obsize = 50, popsize = NA, samplesperhost = 1,
   res <- sim_additionalsamples(res, samplesperhost, additionalsampledelay)
   res <- sim_phylotree(res, wh.model, wh.bottleneck, wh.slope, wh.exponent, wh.level, wh.history, sample.mean)
   res <- sim_sequences(res, mu, sequence.length)
-  if(contact)
-    res <- sim_contact_matrix(res, contact.symmetric, contact.probs, 
-                              cnt.invest.trans, cnt.invest.nontrans, cnt.rep, cnt.rep.false)
+  
+  if(contact){
+    res <- sim_contact_matrix(res, R0, contact.prob.trans, contact.prop)
+    # res <- sim_contact_matrix(res, contact.symmetric, contact.probs, 
+                              # cnt.invest.trans, cnt.invest.nontrans, cnt.rep, cnt.rep.false)
+  }
 
   hostnames <- paste0("host.", 1:obsize)
   samplenames <- paste0("sample.", res$nodehosts[1:res$Nsamples], ".", nthsample(res))
@@ -134,9 +162,9 @@ sim_phybreak <- function(obsize = 50, popsize = NA, samplesperhost = 1,
   if(spatial) {
     rownames(res$locations) <- hostnames
   }
-  if(contact) {
-    rownames(res$contact.matrix) <- colnames(res$contact.matrix) <- hostnames
-  }
+  # if(contact) {
+  #   rownames(res$contact.matrix) <- colnames(res$contact.matrix) <- hostnames
+  # }
   
   ### make a phylo tree
   treeout <- phybreak2phylo(vars = environment2phybreak(res), samplenames = samplenames, simmap = FALSE)
@@ -168,7 +196,6 @@ sim_phybreak <- function(obsize = 50, popsize = NA, samplesperhost = 1,
   toreturn$admission.times <- res$admissiontimes
   if (contact){
     toreturn$contact.matrix <- res$contact.matrix
-    toreturn$contact.categories <- res$contact.categories
   }
   return(toreturn)
 }
@@ -449,55 +476,84 @@ sim_sequences <- function (sim.object, mu, sequence.length) {
   )
 }
 
-sim_contact_matrix <- function(sim.object, contact.symmetric, contact.probs, 
-                               cnt.invest.trans, cnt.invest.nontrans, cnt.rep, cnt.rep.false) {
+# sim_contact_matrix <- function(sim.object, contact.symmetric, contact.probs, 
+#                                cnt.invest.trans, cnt.invest.nontrans, cnt.rep, cnt.rep.false) {
+sim_contact_matrix <- function(sim.object, R0, contact.prob.trans, contact.prop){
   with(sim.object, {
     n = obs
-    
-    if (!is.matrix(contact.probs))
-      if (contact.probs == 1) 
-        contact.probs <- t(contact.probs)
-    
-    categories <- sample(1:nrow(contact.probs), n, replace = TRUE)
-    if (contact.symmetric){
-      if (!isSymmetric(contact.probs))
-        stop("Contact probabilities should be a symmetric matrix if contact.symmetric = TRUE")
-    }
-    
-    # transmission pair with contact
-    tp.wc <- (1-cnt.invest.trans)*cnt.rep.false + cnt.invest.trans*cnt.rep
-    # non-transmission pair with contact
-    np.wc <- (1-cnt.invest.nontrans)*cnt.rep.false + cnt.invest.nontrans*cnt.rep
-    # transmission pair no contact
-    tp.nc <- (1-cnt.invest.trans)*(1-cnt.rep.false) + cnt.invest.trans*(1-cnt.rep)
-    # non-transmission pair no contact
-    np.nc <- (1-cnt.invest.nontrans)*(1-cnt.rep.false) + cnt.invest.nontrans*(1-cnt.rep)
-    
-    mat <- matrix(0, nrow = n, ncol = n)
-    for (i in 1:(n-1)){
-      for (j in (i+1):n){
-        if (contact.symmetric){
-          if (infectors[i] == j | infectors[j] == i){
-            mat[i,j] <- sample(c(0,1), 1, prob = c(tp.nc, tp.wc) * contact.probs[categories[i],categories[j]])
-          } else {
-            mat[i,j] <- sample(c(0,1), 1, prob = c(np.nc,  np.wc) * contact.probs[categories[i],categories[j]])
-          }
-        } else {
-          if (infectors[i] == j) mat[i,j] <- sample(c(0,1), 1, prob = c(tp.nc, tp.wc) * contact.probs[categories[i],categories[j]])
-          else if (infectors[j] == i) mat[j,i] <- sample(c(0,1), 1, prob = c(tp.nc, tp.wc) * contact.probs[categories[i],categories[j]])
-          else {
-            mat[i,j] <- sample(c(0,1), 1, prob = c(np.nc, np.wc) * contact.probs[categories[i],categories[j]])
-            mat[j,i] <- sample(c(0,1), 1, prob = c(np.nc, np.wc) * contact.probs[categories[i],categories[j]])
-          }
+
+    matrix.list <- lapply(seq_along(contact.prob.trans), function(i){
+      prob <- contact.prob.trans[i]
+      m <- matrix(NA, nrow = n, ncol = n)
+      nr_tp_contacts <- prob * n
+      tp_contacts_pos <- sample(seq_along(infectors[infectors != 0]), 
+        floor(nr_tp_contacts), replace = FALSE)
+      m.infectors <- rep(0, length(infectors))
+      m.infectors[infectors != 0][tp_contacts_pos] <- 1
+
+      for (j in seq_along(infectors)){
+        if (infectors[j] != 0){
+          m[infectors[j], j] <- m.infectors[j]
         }
       }
-    }
-    if (contact.symmetric) contact <- mat + t(mat)
-    else contact <- mat
+
+      m.uppertri <- which(upper.tri(m) & is.na(m))
+      nr_ntp_contacts <- floor(contact.prop[i] * length(m.uppertri))
+      m.uppertri.pos <- sample(seq_along(m.uppertri), nr_ntp_contacts, 
+        replace = FALSE)
+      m[m.uppertri][m.uppertri.pos] <- 1 
+      m[upper.tri(m) & is.na(m)] <- 0
+      m[lower.tri(m)] <- t(m)[lower.tri(m)]
+      m[is.na(m)] <- 0
+
+      return(m)
+    })
+
+
+    # if (!is.matrix(contact.probs))
+    #   if (contact.probs == 1) 
+    #     contact.probs <- t(contact.probs)
+    
+    # categories <- sample(1:nrow(contact.probs), n, replace = TRUE)
+    # if (contact.symmetric){
+    #   if (!isSymmetric(contact.probs))
+    #     stop("Contact probabilities should be a symmetric matrix if contact.symmetric = TRUE")
+    # }
+    
+    # # transmission pair with contact
+    # tp.wc <- (1-cnt.invest.trans)*cnt.rep.false + cnt.invest.trans*cnt.rep
+    # # non-transmission pair with contact
+    # np.wc <- (1-cnt.invest.nontrans)*cnt.rep.false + cnt.invest.nontrans*cnt.rep
+    # # transmission pair no contact
+    # tp.nc <- (1-cnt.invest.trans)*(1-cnt.rep.false) + cnt.invest.trans*(1-cnt.rep)
+    # # non-transmission pair no contact
+    # np.nc <- (1-cnt.invest.nontrans)*(1-cnt.rep.false) + cnt.invest.nontrans*(1-cnt.rep)
+    
+    # mat <- matrix(0, nrow = n, ncol = n)
+    # for (i in 1:(n-1)){
+    #   for (j in (i+1):n){
+    #     if (contact.symmetric){
+    #       if (infectors[i] == j | infectors[j] == i){
+    #         mat[i,j] <- sample(c(0,1), 1, prob = c(tp.nc, tp.wc) * contact.probs[categories[i],categories[j]])
+    #       } else {
+    #         mat[i,j] <- sample(c(0,1), 1, prob = c(np.nc,  np.wc) * contact.probs[categories[i],categories[j]])
+    #       }
+    #     } else {
+    #       if (infectors[i] == j) mat[i,j] <- sample(c(0,1), 1, prob = c(tp.nc, tp.wc) * contact.probs[categories[i],categories[j]])
+    #       else if (infectors[j] == i) mat[j,i] <- sample(c(0,1), 1, prob = c(tp.nc, tp.wc) * contact.probs[categories[i],categories[j]])
+    #       else {
+    #         mat[i,j] <- sample(c(0,1), 1, prob = c(np.nc, np.wc) * contact.probs[categories[i],categories[j]])
+    #         mat[j,i] <- sample(c(0,1), 1, prob = c(np.nc, np.wc) * contact.probs[categories[i],categories[j]])
+    #       }
+    #     }
+    #   }
+    # }
+    # if (contact.symmetric) contact <- mat + t(mat)
+    # else contact <- mat
     
     return(within(sim.object,{
-      contact.matrix <- contact
-      contact.categories <- categories
+      if (length(matrix.list) == 1) contact.matrix <- matrix.list[[1]]
+      else contact.matrix <- matrix.list
     }))
   })
 }
