@@ -66,7 +66,7 @@ sim_phybreak <- function(obsize = 50, popsize = NA, samplesperhost = 1,
                          wh.model = "linear", wh.bottleneck = "auto", wh.slope = 1, wh.exponent = 1, wh.level = 0.1,
                          wh.history = 100,
                          dist.model = "power", dist.exponent = 2, dist.scale = 1,
-                         contact.types = 1, contact.prob.trans = 0.5, contact.prop = 0.5,
+                         contact.prob.trans = 0.5, contact.prop = 0.5,
                          mu = 0.0001, sequence.length = 10000, ...) {
   
   ### parameter name compatibility 
@@ -95,27 +95,31 @@ sim_phybreak <- function(obsize = 50, popsize = NA, samplesperhost = 1,
     stop("parameter values should be positive")
   }
   if(contact){
-    if(length(contact.prob.trans) != contact.types || length(contact.prop) != contact.types)
-      stop("length of contact parameters should equal number of contact types")
-    
-    # Convert contact.prop.trans into contact.coeff
-    neq <- length(contact.prob.trans)
-    # Initialize coefficient matrix A and the constant vector B
-    A <- matrix(0, nrow = neq, ncol = neq)  # Coefficient matrix
-    rhs <- numeric(neq)                    # Right-hand side vector
-
-    # Fill the coefficient matrix A and right-hand side vector
-    for (i in 1:neq) {
-      # Fill in the coefficient matrix A
-      A[i, i] <- contact.prop[i] * (1 - contact.prob.trans[i])
-      
-      # Compute the right-hand side
-      rhs[i] <- contact.prob.trans[i] * (R0 + sum(contact.prop * contact.prob.trans))
+    if(length(contact.prob.trans) != length(contact.prop) & length(contact.prop) > 1)
+      stop("length of contact transmission probabilities should equal number of contact proportions")
+    else if (length(contact.prob.trans) != length(contact.prop) & length(contact.prop) == 1){
+      warning("length of contact transmission probabilities not equal to contact proportions, contact proportion used for all routes")
+      contact.prop <- rep(contact.prop, length(contact.prob.trans))
     }
+    
+    # # Convert contact.prop.trans into contact.coeff
+    # neq <- length(contact.prob.trans)
+    # # Initialize coefficient matrix A and the constant vector B
+    # A <- matrix(0, nrow = neq, ncol = neq)  # Coefficient matrix
+    # rhs <- numeric(neq)                    # Right-hand side vector
 
-    # Solve the linear system A * x = B for x (where x is the vector [a1, a2, ... an])
-    contact.coeff <- solve(A, rhs)
-    print(contact.coeff)
+    # # Fill the coefficient matrix A and right-hand side vector
+    # for (i in 1:neq) {
+    #   # Fill in the coefficient matrix A
+    #   A[i, i] <- contact.prop[i] * (1 - contact.prob.trans[i])
+      
+    #   # Compute the right-hand side
+    #   rhs[i] <- contact.prob.trans[i] * (R0 + sum(contact.prop * contact.prob.trans))
+    # }
+
+    # # Solve the linear system A * x = B for x (where x is the vector [a1, a2, ... an])
+    # contact.coeff <- solve(A, rhs)
+    # print(contact.coeff)
     
     #R0 <- R0 + sum(contact.coeff * contact.prop)
   }
@@ -150,7 +154,7 @@ sim_phybreak <- function(obsize = 50, popsize = NA, samplesperhost = 1,
   res <- sim_sequences(res, mu, sequence.length)
   
   if(contact){
-    res <- sim_contact_matrix(res, R0, contact.prob.trans, contact.prop)
+    res <- sim_contact_matrix(res, contact.prob.trans, contact.prop)
     # res <- sim_contact_matrix(res, contact.symmetric, contact.probs, 
                               # cnt.invest.trans, cnt.invest.nontrans, cnt.rep, cnt.rep.false)
   }
@@ -196,6 +200,7 @@ sim_phybreak <- function(obsize = 50, popsize = NA, samplesperhost = 1,
   toreturn$admission.times <- res$admissiontimes
   if (contact){
     toreturn$contact.matrix <- res$contact.matrix
+    toreturn$contact.infection.routes <- res$contact.infection.routes
   }
   return(toreturn)
 }
@@ -478,36 +483,68 @@ sim_sequences <- function (sim.object, mu, sequence.length) {
 
 # sim_contact_matrix <- function(sim.object, contact.symmetric, contact.probs, 
 #                                cnt.invest.trans, cnt.invest.nontrans, cnt.rep, cnt.rep.false) {
-sim_contact_matrix <- function(sim.object, R0, contact.prob.trans, contact.prop){
+sim_contact_matrix <- function(sim.object, contact.prob.trans, contact.prop){
   with(sim.object, {
-    n = obs
+    n = sum(infectors > 0)
+    # tp_contact_prob <- sapply(seq_along(contact.prob.trans), function(i){
+    #   (sum(contact.coeff)+R0)*contact.prop[i] / (R0 + sum(contact.coeff * contact.prop))
+    # })
+    #tp_contact_prob <- (contact.coeff*contact.prop + R0*contact.prop)/(R0+contact.coeff*contact.prop)
+    tp_contact_prob <- contact.prob.trans + (1-contact.prob.trans)*contact.prop
+    
+    # tp_nocontact_prob <- sapply(seq_along(contact.prob.trans), function(i){
+    #   R0*(1-contact.prop[i]) / (R0 + sum(contact.coeff * contact.prop))
+    # })
+    #tp_nocontact_prob <- (R0*(1-contact.prop)) / (R0+contact.coeff*contact.prop)
+    # tp_nocontact_prob <- (-1 + contact.prop) * (-1 + contact.prob.trans)
 
+    tp_contacts <- lapply(seq_along(tp_contact_prob), function(i){
+      sample(c(0,1), n, prob = c(1-tp_contact_prob[i], tp_contact_prob[i]), replace = T)
+    })
+    # nr_tp_contacts <- sapply(seq_along(contact.prob.trans), function(i) contact.prob.trans[i] * n)
+    # infect.by.route <- lapply(nr_tp_contacts, function(ntps){
+    #   sample(which(infectors != 0), ceiling(ntps), replace = F)
+    # })
+    
+    # infect.routes <- sample(c(0, seq_along(contact.prob.trans)), 
+    #                         sum(infectors > 0), 
+    #                         prob = c(1-sum(contact.prob.trans), contact.prob.trans),
+    #                         replace = TRUE)
+    
     matrix.list <- lapply(seq_along(contact.prob.trans), function(i){
-      prob <- contact.prob.trans[i]
-      m <- matrix(NA, nrow = n, ncol = n)
-      nr_tp_contacts <- prob * n
-      tp_contacts_pos <- sample(seq_along(infectors[infectors != 0]), 
-        floor(nr_tp_contacts), replace = FALSE)
+      m <- matrix(NA, nrow = obs, ncol = obs)
       m.infectors <- rep(0, length(infectors))
-      m.infectors[infectors != 0][tp_contacts_pos] <- 1
+      # m.infectors[infect.by.route[[i]]] <- 1
+      m.infectors[infectors != 0] <- tp_contacts[[i]]
+
+
+      # nr_tp_contacts <- prob * n
+      # tp_contacts_pos <- sample(seq_along(infectors[infectors != 0]), 
+      #   floor(nr_tp_contacts), replace = FALSE)
+      # m.infectors <- rep(0, length(infectors))
+      # m.infectors[infectors != 0][tp_contacts_pos] <- 1
 
       for (j in seq_along(infectors)){
         if (infectors[j] != 0){
-          m[infectors[j], j] <- m.infectors[j]
+          if (infectors[j] > j) m[j, infectors[j]] <- m.infectors[j]
+          else m[infectors[j], j] <- m.infectors[j]
         }
       }
 
       m.uppertri <- which(upper.tri(m) & is.na(m))
-      nr_ntp_contacts <- floor(contact.prop[i] * length(m.uppertri))
-      m.uppertri.pos <- sample(seq_along(m.uppertri), nr_ntp_contacts, 
-        replace = FALSE)
-      m[m.uppertri][m.uppertri.pos] <- 1 
-      m[upper.tri(m) & is.na(m)] <- 0
+      m.uppertri <- sample(c(0,1), length(m.uppertri), replace = TRUE, 
+                           prob = c(1-contact.prop[i], contact.prop[i]))
+      m[which(upper.tri(m) & is.na(m))] <- m.uppertri
       m[lower.tri(m)] <- t(m)[lower.tri(m)]
       m[is.na(m)] <- 0
 
       return(m)
     })
+
+    # contact.infection.routes <- rep(0, length(infectors))
+    # for (i in seq_along(infect.by.route)){
+    #   contact.infection.routes[infect.by.route[[i]]] <- i
+    # }
 
 
     # if (!is.matrix(contact.probs))
@@ -554,6 +591,8 @@ sim_contact_matrix <- function(sim.object, R0, contact.prob.trans, contact.prop)
     return(within(sim.object,{
       if (length(matrix.list) == 1) contact.matrix <- matrix.list[[1]]
       else contact.matrix <- matrix.list
+
+      # contact.infection.routes <- contact.infection.routes
     }))
   })
 }

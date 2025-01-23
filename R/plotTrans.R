@@ -103,10 +103,9 @@ plotTrans <- function(x, plot.which = c("sample", "edmonds", "mpc", "mtcc"), sam
     if (plot.which != "sample") {
       tree2plot <- suppressWarnings(transtree(x, plot.which, 
                                               infection.times = "infector", time.quantiles = 0.5))
-      
       if (plot.which == "mpc") {
         besttree <- transtree(x, "mpc", show.besttree = T)
-        tree2plot$inf.times.Q50 = x$s$inftimes[,besttree]
+        tree2plot$inf.times.Q50 = x$s$inftimes[,besttree] + x$d$reference.date
       }
       # tree2plot$infector[tree2plot$infector=="history"] <- "index"
       # tree2plot <- tree2plot[-1,]

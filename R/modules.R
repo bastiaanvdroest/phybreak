@@ -385,7 +385,8 @@ contact_parameters <- function(le,
   # Helperslot
   le$helperslot <- c(le$helperslot, list(
     est.cnt.coeff = est.cnt.coeff,
-    est.cnt.prop = est.cnt.prop
+    est.cnt.prop = est.cnt.prop,
+    cnt.prop = contact.prop
   ))
   
   # Sampleslot
@@ -418,34 +419,32 @@ contact_functions <- function(le){
       }))
       
       # For each contact route, compute loglikelihood part of contact risk: contact rel risk times proportion
-      lik.routes <- unlist(lapply(seq_len(dim(contactarray)[3]), function(r){
-        return(p$contact.coeff[r] * p$contact.prop[r])
-      }))
+      lik.routes <- p$contact.coeff * p$contact.prop
 
       return(sum(lik.host) - (c0 + sum(lik.routes)) * length(v$infectors))
     })
-
     # Likelihood for contact proportions
-    lik.prop <- with(le, {
-      total <- length(v$infectors)
-      othercases <- sum(v$infectors != 0)
-      non_transmission <- total * (total - 1)/2 - othercases
+    # lik.prop <- with(le, {
+    #   total <- length(v$infectors)
+    #   othercases <- sum(v$infectors != 0)
+    #   non_transmission <- total * (total - 1)/2 - othercases
 
-      lik.routes <- unlist(lapply(seq_len(dim(contactarray)[3]), function(r){
-        all <- sum(contactarray[,,r])
-        trans <- 0
-        for (i in seq_along(v$infectors)){
-          if (v$infectors[i] != 0){
-            trans <- trans + contactarray[i,v$infectors[i],r]
-          }
-        }
-        contacts <- all - trans
-        return(contacts * log(p$contact.prop[r]) + (non_transmission - contacts) * log(1-p$contact.prop[r]))
-      }))
+    #   lik.routes <- unlist(lapply(seq_len(dim(contactarray)[3]), function(r){
+    #     all <- sum(contactarray[,,r])
+    #     trans <- 0
+    #     for (i in seq_along(v$infectors)){
+    #       if (v$infectors[i] != 0){
+    #         trans <- trans + contactarray[i,v$infectors[i],r]
+    #       }
+    #     }
+    #     contacts <- all - trans
+    #     return(contacts * log(p$contact.prop[r]) + (non_transmission - contacts) * log(1-p$contact.prop[r]))
+    #   }))
 
-      return(sum(lik.routes))
-    })
-    return(lik.coeff + lik.prop)
+    #   return(sum(lik.routes))
+    # })
+    # print(lik.prop)
+    # return(lik.coeff) + lik.prop)
   }
 
   le$updaters[["update_contact_coeff"]] <- function() {
@@ -461,7 +460,10 @@ contact_functions <- function(le){
     n <- sample(length(p$contact.coeff), 1)
 
     ### change to proposal state
-    coeff.new <- exp(log(p$contact.coeff[n]) + rnorm(1, 0, 1))
+    coeff.new <- rnorm(1, mean = p$contact.coeff[n], sd = 0.1)
+    while(coeff.new < 0){
+      coeff.new <- rnorm(1, mean = p$contact.coeff[n], sd = 0.1)
+    }
     p$contact.coeff[n] <- coeff.new
 
     ### update proposal environment
@@ -499,7 +501,7 @@ contact_functions <- function(le){
     n <- sample(length(p$contact.prop), 1)
 
     ### change to proposal state
-    prop.new <- exp(log(p$contact.prop[n]) + rnorm(1, 0, 1))
+    prop.new <- rnorm(1, mean = h$cnt.prop, sd = 0.05)
     if (prop.new < 0 || prop.new >= 1)
       return()
 

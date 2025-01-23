@@ -202,7 +202,6 @@ propose_pbe <- function(f) {
   contactarray <- pbe0$contactarray
   lik_func <- pbe0$lik_func
   hostID <- pbe1$hostID
-  
   if (f == "phylotrans" || f == "withinhost") {
     # identify changed nodes
     chnodes <- c(which((v$nodeparents != pbe0$v$nodeparents[1:length(v$nodeparents)]) | 
