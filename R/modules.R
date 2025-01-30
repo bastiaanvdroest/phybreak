@@ -50,7 +50,7 @@ add_modules_to_phybreak <- function(le,
 introductions_parameters <- function(le, introductions = 1, 
     wh.history = 1, intro.rate = 1, reproduction.rate = 1,
     est.intro.rate = TRUE, prior.intro.rate.mean = 1, prior.intro.rate.shape = 1,
-    est.reproduction = TRUE, prior.reproduction.rate = 0.1,
+    est.reproduction = TRUE, prior.reproduction.mean = 0.1, prior.reproduction.sd = 0.2,
     est.wh.history = TRUE, prior.wh.history.shape = 1, prior.wh.history.mean = 100,
     use.NJtree = TRUE){
   
@@ -69,7 +69,8 @@ introductions_parameters <- function(le, introductions = 1,
     est.wh.h = est.wh.history,
     ir.av = prior.intro.rate.mean,
     ir.sh = prior.intro.rate.shape,
-    R.rate = prior.reproduction.rate,
+    R.av = prior.reproduction.mean,
+    R.sd = prior.reproduction.sd,
     wh.h.sh = prior.wh.history.shape,
     wh.h.av = prior.wh.history.mean))
   

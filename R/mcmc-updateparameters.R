@@ -211,11 +211,15 @@ update_reproduction <- function(){
     propose_pbe("R")
 
     ### calculate acceptance probability
-    if (p$contact)
-      logaccprob <- pbe1$logLikcontact - pbe0$logLikcontact + logproposalratio
-    else 
-      logaccprob <- pbe1$logLikgen - pbe0$logLikgen + logproposalratio
-    
+    if (p$contact) {
+      logaccprob <- pbe1$logLikcontact - pbe0$logLikcontact + logproposalratio +
+      dnorm(pbe1$p$R, mean = h$R.av, sd = h$R.sd) -
+      dnorm(pbe0$p$R, mean = h$R.av, sd = h$R.sd)
+    } else {
+      logaccprob <- pbe1$logLikgen - pbe0$logLikgen + logproposalratio +
+      dnorm(pbe1$p$R, mean = h$R.av, sd = h$R.sd) -
+      dnorm(pbe0$p$R, mean = h$R.av, sd = h$R.sd)
+    }
     ### accept
     if (runif(1) < exp(logaccprob)) {
       if (p$contact) 
