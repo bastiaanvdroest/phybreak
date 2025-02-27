@@ -486,43 +486,35 @@ sim_sequences <- function (sim.object, mu, sequence.length) {
 sim_contact_matrix <- function(sim.object, contact.prob.trans, contact.prop){
   with(sim.object, {
     n = sum(infectors > 0)
-    # tp_contact_prob <- sapply(seq_along(contact.prob.trans), function(i){
-    #   (sum(contact.coeff)+R0)*contact.prop[i] / (R0 + sum(contact.coeff * contact.prop))
-    # })
-    #tp_contact_prob <- (contact.coeff*contact.prop + R0*contact.prop)/(R0+contact.coeff*contact.prop)
-    tp_contact_prob <- contact.prob.trans + (1-contact.prob.trans)*contact.prop
+    # Calculate probability of contact for transmission pairs
+    tp_contact_prob <- round(contact.prob.trans + (n-contact.prob.trans)*contact.prop)
     
-    # tp_nocontact_prob <- sapply(seq_along(contact.prob.trans), function(i){
-    #   R0*(1-contact.prop[i]) / (R0 + sum(contact.coeff * contact.prop))
+    # Sample contact of transmission pairs with probability above
+    # tp_contacts <- lapply(seq_along(contact.prob.trans), function(i){
+    #   sample(c(0,1), n, prob = c(1-tp_contact_prob[i], tp_contact_prob[i]), replace = T)
     # })
-    #tp_nocontact_prob <- (R0*(1-contact.prop)) / (R0+contact.coeff*contact.prop)
-    # tp_nocontact_prob <- (-1 + contact.prop) * (-1 + contact.prob.trans)
 
-    tp_contacts <- lapply(seq_along(tp_contact_prob), function(i){
-      sample(c(0,1), n, prob = c(1-tp_contact_prob[i], tp_contact_prob[i]), replace = T)
+    # Randomly distribute number of transmissions via routes over the hosts
+    random_vector <- rep(0, n)
+    indices <- sample(1:n, sum(n))
+    start <- 1
+    for (category in 1:length(contact.prob.trans)) {
+      end <- start + tp_contact_prob[category] - 1
+      random_vector[indices[start:end]] <- category
+      start <- end + 1
+    }
+    # Split random_vector into n vectors
+    tp_contacts <- lapply(1:length(contact.prob.trans), function(category) {
+      x <- ifelse(random_vector == category, category, 0)
+      ifelse(x > 0, 1, 0)      
     })
-    # nr_tp_contacts <- sapply(seq_along(contact.prob.trans), function(i) contact.prob.trans[i] * n)
-    # infect.by.route <- lapply(nr_tp_contacts, function(ntps){
-    #   sample(which(infectors != 0), ceiling(ntps), replace = F)
-    # })
-    
-    # infect.routes <- sample(c(0, seq_along(contact.prob.trans)), 
-    #                         sum(infectors > 0), 
-    #                         prob = c(1-sum(contact.prob.trans), contact.prob.trans),
-    #                         replace = TRUE)
-    
+
+    # Create contact data matrix by fill in transmission pair contacts and sample nontransmission pair contact
     matrix.list <- lapply(seq_along(contact.prob.trans), function(i){
       m <- matrix(NA, nrow = obs, ncol = obs)
       m.infectors <- rep(0, length(infectors))
       # m.infectors[infect.by.route[[i]]] <- 1
       m.infectors[infectors != 0] <- tp_contacts[[i]]
-
-
-      # nr_tp_contacts <- prob * n
-      # tp_contacts_pos <- sample(seq_along(infectors[infectors != 0]), 
-      #   floor(nr_tp_contacts), replace = FALSE)
-      # m.infectors <- rep(0, length(infectors))
-      # m.infectors[infectors != 0][tp_contacts_pos] <- 1
 
       for (j in seq_along(infectors)){
         if (infectors[j] != 0){
@@ -532,21 +524,24 @@ sim_contact_matrix <- function(sim.object, contact.prob.trans, contact.prop){
       }
 
       m.uppertri <- which(upper.tri(m) & is.na(m))
-      m.uppertri <- sample(c(0,1), length(m.uppertri), replace = TRUE, 
-                           prob = c(1-contact.prop[i], contact.prop[i]))
-      m[which(upper.tri(m) & is.na(m))] <- m.uppertri
+      # m.uppertri <- sample(c(0,1), length(m.uppertri), replace = TRUE, 
+      #                      prob = c(1-contact.prop[i], contact.prop[i]))
+
+      if (round((length(infectors)^2-length(infectors)) * contact.prop[i] / 2 - tp_contact_prob[i]) > length(m.uppertri)){
+        m[m.uppertri] <- 1
+      } else if (round((length(infectors)^2-length(infectors)) * contact.prop[i] / 2) < tp_contact_prob[i]){
+        m[m.uppertri] <- 0
+      } else {
+        indices <- sample(m.uppertri, round((length(infectors)^2-length(infectors)) * contact.prop[i] / 2 - tp_contact_prob[i]))
+        m[indices] <- 1
+        m[setdiff(m.uppertri, indices)] <- 0
+      }
+      # m[which(upper.tri(m) & is.na(m))] <- m.uppertri
       m[lower.tri(m)] <- t(m)[lower.tri(m)]
-      m[is.na(m)] <- 0
+      diag(m) <- 0
 
       return(m)
     })
-
-    # contact.infection.routes <- rep(0, length(infectors))
-    # for (i in seq_along(infect.by.route)){
-    #   contact.infection.routes[infect.by.route[[i]]] <- i
-    # }
-
-
     # if (!is.matrix(contact.probs))
     #   if (contact.probs == 1) 
     #     contact.probs <- t(contact.probs)

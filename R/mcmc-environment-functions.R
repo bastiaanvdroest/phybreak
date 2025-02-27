@@ -18,7 +18,6 @@
 # The environments are used during MCMC-updating, and in sim_phybreak and phybreak to simulate the phylogenetic tree.
 pbe0 <- new.env()
 pbe1 <- new.env()
-userenv <- new.env()
 
 # Copy functions to phybreak environments
 copy2pbe0 <- function(var, env) {
@@ -36,6 +35,14 @@ copy2pbe1_2 <- function(var, env) {
 copy2userenv <- function(var, env) {
   assign(var, get(var, env), userenv)
 }
+
+# Dirichlet pdf
+dirichlet_pdf <- function(theta, alpha) {
+  if (any(theta <= 0) || round(sum(theta), digits = 10) != 1) return(0) # Simplex-constraint
+  gamma_sum <- sum(lgamma(alpha)) - lgamma(sum(alpha))
+  prod_terms <- sum((alpha - 1) * log(theta))
+  return(exp(sum(prod_terms) - gamma_sum))
+ }
 
 ### build the pbe0 at the start of an mcmc chain by copying the fixed parameters and phybreak object, and by
 ### calculating likarray and the log-likelihoods 
