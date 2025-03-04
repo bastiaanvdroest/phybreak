@@ -347,30 +347,30 @@ spatial_functions <- function(le){
 ### Contact
 #' Module for contact data
 #' 
-#' @param contact.coeff      Relative risk of contact on transmission. Vector must contain the same number
+#' @param contact.fracs      Relative risk of contact on transmission. Vector must contain the same number
 #'                           of elements as there are contact routes (the length of the contact matrix list)
 #'  
 #' @export
 contact_parameters <- function(le,
-    contact.coeff = NA, est.cnt.coeff = T, 
-    prior.cnt.coeff.means = NA, prior.cnt.coeff.strength = 10,
+    contact.fracs = NA, est.cnt.fracs = T, 
+    prior.cnt.fracs.means = NA, prior.cnt.fracs.strength = 10,
     contact.prop = NA, est.cnt.prop = F){
   
   # Dataslot
   le$dataslot$contact <- le$dataset$contact.matrix
   
   if (inherits(le$dataset$contact.matrix, "matrix")){
-    if (is.na(contact.coeff)) contact.coeff <- 1
-    else if (length(contact.coeff) != 1) 
-      stop("Contact coefficient vector should be the same length as the number of contact matrices")
+    if (is.na(contact.fracs)) contact.fracs <- 0.5
+    else if (length(contact.fracs) != 1) 
+      stop("Contact fractions vector should be the same length as the number of contact matrices")
 
     if (any(is.na(contact.prop))){
       contact.prop <- sum(le$dataset$contact.matrix)/(ncol(le$dataset$contact.matrix)^2-ncol(le$dataset$contact.matrix))
     }
   } else if (inherits(le$dataset$contact.matrix, "list")){
-    if (is.na(contact.coeff)) contact.coeff <- rep(1, length(le$dataset$contact.matrix))
-    else if (length(contact.coeff) != length(le$dataset$contact.matrix)){
-      stop("Contact coefficient vector should be the same length as the number of contact matrices")
+    if (is.na(contact.fracs)) contact.fracs <- rep(1/(length(le$dataset$contact.matrix)+1), length(le$dataset$contact.matrix))
+    else if (length(contact.fracs) != length(le$dataset$contact.matrix)){
+      stop("Contact fractions vector should be the same length as the number of contact matrices")
     }
     if(any(is.na(contact.prop))){ 
       contact.prop <- do.call(c, lapply(le$dataset$contact.matrix, function(m){
@@ -383,31 +383,31 @@ contact_parameters <- function(le,
   
 
   ### translate means into right format
-  if(all(is.na(prior.cnt.coeff.means))) {
-    alpha = rep(1,length(contact.coeff)+1)
-  } else if (length(prior.cnt.coeff.means) != length(contact.coeff)+1) {
-    alpha <- prior.cnt.coeff.strength * c(1-sum(prior.cnt.coeff.means), prior.cnt.coeff.means)
+  if(all(is.na(prior.cnt.fracs.means))) {
+    alpha = rep(1,length(contact.fracs)+1)
+  } else if (length(prior.cnt.fracs.means) != length(contact.fracs)+1) {
+    alpha <- prior.cnt.fracs.strength * c(1-sum(prior.cnt.fracs.means), prior.cnt.fracs.means)
   } else {
-    alpha <- prior.cnt.coeff.strength * prior.cnt.coeff.means
+    alpha <- prior.cnt.fracs.strength * prior.cnt.fracs.means
   }
 
   # Parameterslot
   le$parameterslot <- c(le$parameterslot, list(
     contact = TRUE,
-    contact.coeff = contact.coeff,
+    contact.fracs = contact.fracs,
     contact.prop = contact.prop))
   
   # Helperslot
   le$helperslot <- c(le$helperslot, list(
-    est.cnt.coeff = est.cnt.coeff,
-    cnt.coeff.alpha = alpha,
+    est.cnt.fracs = est.cnt.fracs,
+    cnt.fracs.alpha = alpha,
     est.cnt.prop = est.cnt.prop,
     cnt.prop = contact.prop
   ))
   
   # Sampleslot
   le$sampleslot <- c(le$sampleslot, list(
-    contact.coeff = NULL,
+    contact.fracs = NULL,
     contact.prop = NULL))
   return(le)
 }
@@ -417,30 +417,36 @@ contact_functions <- function(le){
   # calculate the log-likelihood of contacts
   le$likelihoods[["logLikcontact"]] <- function(le){
 
-    # Likelihood for contact coefficients
-    lik.coeff <- with(le, {
-      c0 <- p$R
+    # Likelihood for contact fractions
+    lik.fracs <- with(le, {
+      # Add fraction and proportion of unknown route
+      p$contact.fracs <- c(1-sum(p$contact.fracs), p$contact.fracs) 
+      p$contact.prop <- c(1, p$contact.prop)
+
+      R <- sum(v$infectors > 0) / p$obs
+
       #   For each host
       if (any(v$infectors > 0)){
         lik.host <- sapply(which(v$infectors != 0), function(i){
           # For each contact route
-          lik.i <- sapply(seq_len(dim(contactarray)[3]), function(r){  
+          lik.i <- sapply(seq_len(dim(contactarray)[3]), function(r){
             # Compute loglikelihood
-            return(p$contact.coeff[r] * contactarray[v$infectors[i],i,r])
+            return(R*(p$contact.fracs[r+1]/p$contact.prop[r+1]) * contactarray[v$infectors[i],i,r])
           })
-          return(log(c0 + sum(lik.i)))
+          return(log(R*p$contact.fracs[1] + sum(lik.i)))
         })
       } else {
         lik.host <- 0
       }
-      # For each contact route, compute loglikelihood part of contact risk: contact rel risk times proportion
-      lik.routes <- p$contact.coeff * p$contact.prop
 
-      return(sum(lik.host) - (c0 + sum(lik.routes)) * length(v$infectors))
+      # Remove fraction and proportion of unknown route before storing
+      p$contact.fracs <- p$contact.fracs[-1]
+      p$contact.prop <- p$contact.prop[-1]
+      return(sum(lik.host) - R * p$obs)
     })
   }
 
-  le$updaters[["update_contact_coeff"]] <- function() {
+  le$updaters[["update_contact_fractions"]] <- function() {
     ### create an up-to-date proposal-environment
     prepare_pbe()
     
@@ -450,7 +456,7 @@ contact_functions <- function(le){
     p <- pbe0$p
 
     ### calculate probabilities from rates
-    pbe0.theta <- c(p$R, p$contact.coeff*p$contact.prop)/(p$R + sum(p$contact.coeff*p$contact.prop))
+    pbe0.theta <- c(1-sum(p$contact.fracs), p$contact.fracs)
 
     ### propose new probabilities
     # Function to apply ALR transformation
@@ -485,27 +491,27 @@ contact_functions <- function(le){
 
 
     ### Compute new contact coefficients directly from updated pbe1.theta
-    p$contact.coeff <- sapply(seq_len(length(p$contact.coeff)), function(n) {
-      (pbe1.theta[n+1] * p$R) / (p$contact.prop[n] * pbe1.theta[1])
-    })
+    # p$contact.coeff <- sapply(seq_len(length(p$contact.coeff)), function(n) {
+    #   (pbe1.theta[n+1] * p$R) / (p$contact.prop[n] * pbe1.theta[1])
+    # })
 
     ### update proposal environment
+    p$contact.fracs <- pbe1.theta[-1]
     copy2pbe1("p", le)
-    
     ### calculate proposalratio
-    logproposalratio <- sum(log(p$contact.coeff) - log(pbe0$p$contact.coeff))
+    logproposalratio <- sum(log(pbe1.theta) - log(pbe0.theta))
     
     ### calculate likelihood
-    propose_pbe("contact.coeff")
+    propose_pbe("contact")
     
     ### calculate acceptance probability
     #print(c(pbe1$logLikcontact, pbe0$logLikcontact))
     logaccprob <- pbe1$logLikcontact - pbe0$logLikcontact + logproposalratio +
-    log(dirichlet_pdf(pbe1.theta, h$cnt.coeff.alpha)) - log(dirichlet_pdf(pbe0.theta, h$cnt.coeff.alpha))
+    log(dirichlet_pdf(pbe1.theta, h$cnt.fracs.alpha)) - log(dirichlet_pdf(pbe0.theta, h$cnt.fracs.alpha))
 
     ### accept or reject
     if (runif(1) < exp(logaccprob)) {
-      accept_pbe("contact.coeff")
+      accept_pbe("contact")
     }
   }
 

@@ -116,7 +116,7 @@ phybreak <- function(dataset, times = NULL,
          mu = NULL, gen.shape = 3, gen.mean = 1, 
          sample.shape = 3, sample.mean = 1, 
          wh.model = "linear", wh.bottleneck = "auto", wh.slope = 1, wh.exponent = 1, wh.level = 0.1,
-         reproduction.rate = 1, est.reproduction.rate = T, 
+         reproduction.rate = 1, est.reproduction.rate = T, prior.reproduction.shape = 1, prior.reproduction.mean = 1,
          est.mu = TRUE, prior.mu.mean = 0, prior.mu.sd = 100,
          est.gen.mean = TRUE, prior.gen.mean.mean = 1, prior.gen.mean.sd = Inf,
          est.sample.mean = TRUE, prior.sample.mean.mean = 1, prior.sample.mean.sd = Inf,
@@ -215,7 +215,7 @@ phybreak <- function(dataset, times = NULL,
                      est.wh.s = est.wh.slope && wh.model == "linear",
                      est.wh.e = est.wh.exponent && wh.model == "exponential",
                      est.wh.0 = est.wh.level && wh.bottleneck == "wide",
-                     est.r = est.reproduction.rate,
+                     est.R = est.reproduction.rate,
                      mu.av = prior.mu.mean,
                      mu.sd = prior.mu.sd,
                      mG.av = prior.gen.mean.mean,
@@ -227,7 +227,9 @@ phybreak <- function(dataset, times = NULL,
                      wh.e.sh = prior.wh.exponent.shape,
                      wh.e.av = prior.wh.exponent.mean,
                      wh.0.sh = prior.wh.level.shape,
-                     wh.0.av = prior.wh.level.mean)
+                     wh.0.av = prior.wh.level.mean,
+                     R.sh = prior.reproduction.shape,
+                     R.av = prior.reproduction.mean)
   
   ###########################
   ### fifth slot: samples ###

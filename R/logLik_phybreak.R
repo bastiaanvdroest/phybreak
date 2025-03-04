@@ -80,11 +80,11 @@ lik_gentimes <- function(le){
   othercases <- v$infectors > 0
   
   intro.rate <- ifelse(is.null(p$intro.rate), 1, p$intro.rate)
-  R <- ifelse(is.null(p$R), 1, p$R)
+  R <- sum(othercases)/p$obs #ifelse(is.null(p$R), 1, p$R)
   
   L <- log(intro.rate) * sum(indices) - 
     intro.rate * (max(v$nodetimes) - min(v$inftimes)) 
-  if (!p$contact) L  <- L - length(v$infectors) * R + sum(othercases) * log(R)
+  if (!p$contact) L  <- L - p$obs * R + sum(othercases) * log(R)
   
   if(sum(othercases) == 0)
     return(L)

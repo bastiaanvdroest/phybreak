@@ -121,8 +121,8 @@ sample_phybreak <- function(x, nsample, thin = 1, thinswap = 1, classic = 0, kee
   
   ### create room for additional parameters from modules
   s.post.modules <- lapply(setdiff(names(x$s), names(s.post)), function(n){
-    if(n == "contact.coeff" || n == "contact.prop"){
-      with(x, cbind(s$contact.coeff, matrix(NA, nrow = length(x$p$contact.prop), ncol = nsample)))
+    if(n == "contact.fracs" || n == "contact.prop"){
+      with(x, cbind(s$contact.fracs, matrix(NA, nrow = length(x$p$contact.prop), ncol = nsample)))
     } else{
       return(c(x$s[[n]], rep(NA, nsample)))
     }
@@ -202,7 +202,7 @@ sample_phybreak <- function(x, nsample, thin = 1, thinswap = 1, classic = 0, kee
           if (i == -4 && x$h$est.wh.s)  update_wh_slope()
           if (i == -5 && x$h$est.wh.e)  update_wh_exponent()
           if (i == -6 && x$h$est.wh.0)  update_wh_level()
-          if (i == -7 && x$h$est.r)  update_reproduction()
+          if (i == -7 && x$h$est.R)  update_reproduction()
           if (i < -7)  x$updaters[[-7 - i]]()
           
           # if (i == -7 && x$h$est.wh.h) update_wh_history()
@@ -261,7 +261,7 @@ sample_phybreak <- function(x, nsample, thin = 1, thinswap = 1, classic = 0, kee
       
       if(length(s.post) > 15){
         for(n in setdiff(names(s.post)[16:length(names(s.post))], "chain")){
-          if (n == "contact.coeff" || n == "contact.prop"){
+          if (n == "contact.fracs" || n == "contact.prop"){
             s.post[[n]][,sa] <- pbe0$p[[n]]
           } else {
             s.post[[n]][sa]<- pbe0$p[[n]]

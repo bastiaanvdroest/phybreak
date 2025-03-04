@@ -198,9 +198,9 @@ update_reproduction <- function(){
     le <- environment()
     h <- pbe0$h
     p <- pbe0$p
-    v <- pbe1$v
+    v <- pbe0$v
     
-    p$R <- exp(log(p$R) + rnorm(1, 0, h$si.r))
+    p$R <- sum(v$infectors > 0)/p$obs
     ### update proposal environment
     copy2pbe1("p", le)
     
@@ -212,7 +212,9 @@ update_reproduction <- function(){
 
     ### calculate acceptance probability
     if (p$contact) {   
-      logaccprob <- pbe1$logLikcontact - pbe0$logLikcontact + logproposalratio
+      logaccprob <- pbe1$logLikcontact - pbe0$logLikcontact + logproposalratio +
+      dgamma(pbe1$p$R, shape = h$R.sh, scale = h$R.sh/h$R.av, log = TRUE) - 
+      dgamma(pbe0$p$R, shape = h$R.sh, scale = h$R.sh/h$R.av, log = TRUE)
     } else {
       logaccprob <- pbe1$logLikgen - pbe0$logLikgen + logproposalratio
     }
@@ -390,35 +392,3 @@ update_reproduction <- function(){
 #     accept_pbe("dist.mean")
 #   }
 # }
-
-update_R <- function() {
-  ### create an up-to-date proposal-environment
-  prepare_pbe()
-  
-  ### making variables and parameters available within the function
-  le <- environment()
-  h <- pbe0$h
-  p <- pbe0$p
-  
-  ### change to proposal state
-  p$R <- exp(log(p$R) + rnorm(1, 0, h$si.dist))
-  
-  ### update proposal environment
-  copy2pbe1("p", le)
-  
-  ### calculate proposalratio
-  logproposalratio <- log(p$R) - log(pbe0$p$R)
-  
-  ### calculate likelihood
-  propose_pbe("R")
-  
-  ### calculate acceptance probability
-  logaccprob <- pbe1$logLikgen - pbe0$logLikgen + logproposalratio + 
-    dexp(pbe1$p$R, rate = h$R, log = TRUE) - 
-    dexp(pbe0$p$R, rate = h$R, log = TRUE)
-  
-  ### accept or reject
-  if (runif(1) < exp(logaccprob)) {
-    accept_pbe("ir")
-  }
-}
