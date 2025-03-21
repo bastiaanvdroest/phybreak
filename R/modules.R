@@ -49,7 +49,7 @@ add_modules_to_phybreak <- function(le,
 #' @export
 introductions_parameters <- function(le, introductions = 1, 
     wh.history = 1, intro.rate = 1, reproduction.rate = 1,
-    est.intro.rate = TRUE, prior.intro.rate.mean = 1, prior.intro.rate.shape = 1,
+    est.intro.rate = TRUE, prior.introductions.mean = 1, prior.intro.rate.shape = 0.1,
     est.wh.history = TRUE, prior.wh.history.shape = 1, prior.wh.history.mean = 100,
     use.NJtree = TRUE){
   
@@ -66,7 +66,7 @@ introductions_parameters <- function(le, introductions = 1,
     si.ir = 2.38*sqrt(trigamma(introductions)),
     est.ir = est.intro.rate,
     est.wh.h = est.wh.history,
-    ir.av = prior.intro.rate.mean,
+    ir.sc = prior.introductions.mean / (as.numeric(max(le$dataslot$sample.times) - min(le$dataslot$sample.times)) * prior.intro.rate.shape),
     ir.sh = prior.intro.rate.shape,
     wh.h.sh = prior.wh.history.shape,
     wh.h.av = prior.wh.history.mean))
@@ -144,8 +144,8 @@ introductions_functions <- function(le){
     
     ### calculate acceptance probability
     logaccprob <- pbe1$logLikgen - pbe0$logLikgen + logproposalratio + 
-      dgamma(pbe1$p$intro.rate, shape = h$ir.sh, scale = h$ir.av/h$ir.sh, log = TRUE) - 
-      dgamma(pbe0$p$intro.rate, shape = h$ir.sh, scale = h$ir.av/h$ir.sh, log = TRUE)
+      dgamma(pbe1$p$intro.rate, shape = h$ir.sh, scale = h$ir.sc, log = TRUE) - 
+      dgamma(pbe0$p$intro.rate, shape = h$ir.sh, scale = h$ir.sc, log = TRUE)
     
     ### accept
     if (runif(1) < exp(logaccprob)) {
@@ -419,11 +419,11 @@ contact_functions <- function(le){
 
     # Likelihood for contact fractions
     lik.fracs <- with(le, {
-      # Add fraction and proportion of unknown route
-      p$contact.fracs <- c(1-sum(p$contact.fracs), p$contact.fracs) 
-      p$contact.prop <- c(1, p$contact.prop)
+      # # Add fraction and proportion of unknown route
+      # p$contact.fracs <- p$contact.fracs 
+      # p$contact.prop <- c(p$contact.prop, 1)
 
-      R <- sum(v$infectors > 0) / p$obs
+      R <- p$R
 
       #   For each host
       if (any(v$infectors > 0)){
@@ -431,17 +431,17 @@ contact_functions <- function(le){
           # For each contact route
           lik.i <- sapply(seq_len(dim(contactarray)[3]), function(r){
             # Compute loglikelihood
-            return(R*(p$contact.fracs[r+1]/p$contact.prop[r+1]) * contactarray[v$infectors[i],i,r])
+            return(R*(p$contact.fracs[r]/p$contact.prop[r]) * contactarray[v$infectors[i],i,r])
           })
-          return(log(R*p$contact.fracs[1] + sum(lik.i)))
+          return(log(R*(1-sum(p$contact.fracs)) + sum(lik.i)))
         })
       } else {
         lik.host <- 0
       }
 
       # Remove fraction and proportion of unknown route before storing
-      p$contact.fracs <- p$contact.fracs[-1]
-      p$contact.prop <- p$contact.prop[-1]
+      # p$contact.fracs <- p$contact.fracs[-1]
+      # p$contact.prop <- p$contact.prop[-1]
       return(sum(lik.host) - R * p$obs)
     })
   }
@@ -456,35 +456,41 @@ contact_functions <- function(le){
     p <- pbe0$p
 
     ### calculate probabilities from rates
-    pbe0.theta <- c(1-sum(p$contact.fracs), p$contact.fracs)
+    pbe0.theta <- c(p$contact.fracs, 1-sum(p$contact.fracs))
 
     ### propose new probabilities
     # Function to apply ALR transformation
-    alr_transform <- function(theta) {
-      return(log(theta[-length(theta)] / theta[length(theta)]))
-    }
+    # alr_transform <- function(theta) {
+    #   return(log(theta[-length(theta)] / theta[length(theta)]))
+    # }
 
-    # Function to apply inverse ALR transformation
-    alr_inverse <- function(z) {
-      exp_z <- exp(z)
-      theta <- c(exp_z, 1) / (1 + sum(exp_z))
-      return(theta)
-    }
+    # # Function to apply inverse ALR transformation
+    # alr_inverse <- function(z) {
+    #   exp_z <- exp(z)
+    #   theta <- c(exp_z, 1) / (1 + sum(exp_z))
+    #   return(theta)
+    # }
 
-    # Function to propose a new Dirichlet sample
-    propose_dirichlet_logit <- function(old_theta, sd = 0.05) {
-      # Transform to unconstrained space
-      z_old <- alr_transform(old_theta)
+    # # Function to propose a new Dirichlet sample
+    # propose_dirichlet_logit <- function(old_theta, sd = 0.05) {
+    #   # Transform to unconstrained space
+    #   z_old <- alr_transform(old_theta)
 
-      # Propose in transformed space
-      z_new <- z_old + rnorm(length(z_old), mean = 0, sd = sd)
+    #   # Propose in transformed space
+    #   z_new <- z_old + rnorm(length(z_old), mean = 0, sd = sd)
 
-      # Transform back to simplex
-      new_theta <- alr_inverse(z_new)
+    #   # Transform back to simplex
+    #   new_theta <- alr_inverse(z_new)
 
+    #   return(new_theta)
+    # }
+    # pbe1.theta <- propose_dirichlet_logit(pbe0.theta)
+    propose_dirichlet_simplex <- function(old_theta, concentration = 50) {
+      new_theta <- rgamma(length(old_theta), shape = old_theta * concentration)  
+      new_theta <- new_theta / sum(new_theta)  # Normalize to sum to 1  
       return(new_theta)
-    }
-    pbe1.theta <- propose_dirichlet_logit(pbe0.theta)
+    } 
+    pbe1.theta <- propose_dirichlet_simplex(pbe0.theta)
     
     # pbe1.theta <- pbe0.theta + rnorm(length(pbe0.theta), mean = 0, sd = 0.01)
     # pbe1.theta <- abs(pbe1.theta) / sum(abs(pbe1.theta))
@@ -496,10 +502,19 @@ contact_functions <- function(le){
     # })
 
     ### update proposal environment
-    p$contact.fracs <- pbe1.theta[-1]
+    p$contact.fracs <- head(pbe1.theta, length(p$contact.fracs))
     copy2pbe1("p", le)
     ### calculate proposalratio
-    logproposalratio <- sum(log(pbe1.theta) - log(pbe0.theta))
+    log_gamma_density <- function(x, shape) {
+      return((shape - 1) * log(x) - lgamma(shape))
+    }
+
+    log_proposal_ratio <- function(theta_old, theta_new, concentration) {
+      log_q_new_given_old <- sum(log_gamma_density(theta_new, shape = concentration * theta_old))
+      log_q_old_given_new <- sum(log_gamma_density(theta_old, shape = concentration * theta_new))
+      return(log_q_old_given_new - log_q_new_given_old)
+    }
+    logproposalratio <- log_proposal_ratio(pbe0.theta, pbe1.theta, concentration = 50)
     
     ### calculate likelihood
     propose_pbe("contact")

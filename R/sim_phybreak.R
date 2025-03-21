@@ -487,7 +487,7 @@ sim_contact_matrix <- function(sim.object, contact.prob.trans, contact.prop){
   with(sim.object, {
     n = sum(infectors > 0)
     # Calculate probability of contact for transmission pairs
-    tp_contact_prob <- round(contact.prob.trans + (n-contact.prob.trans)*contact.prop)
+    tp_contact_prob <- contact.prob.trans #round(contact.prob.trans + (n-contact.prob.trans)*contact.prop)
     
     # Sample contact of transmission pairs with probability above
     # tp_contacts <- lapply(seq_along(contact.prob.trans), function(i){
@@ -515,6 +515,9 @@ sim_contact_matrix <- function(sim.object, contact.prob.trans, contact.prop){
       m.infectors <- rep(0, length(infectors))
       # m.infectors[infect.by.route[[i]]] <- 1
       m.infectors[infectors != 0] <- tp_contacts[[i]]
+      m.infectors[m.infectors==0] <- sample(c(1,0),size=sum(m.infectors==0),
+                                            replace=T,
+                                            prob=c(contact.prop[i], 1-contact.prop[i]))
 
       for (j in seq_along(infectors)){
         if (infectors[j] != 0){

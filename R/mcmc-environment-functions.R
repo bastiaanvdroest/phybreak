@@ -18,6 +18,7 @@
 # The environments are used during MCMC-updating, and in sim_phybreak and phybreak to simulate the phylogenetic tree.
 pbe0 <- new.env()
 pbe1 <- new.env()
+userenv <- new.env()
 
 # Copy functions to phybreak environments
 copy2pbe0 <- function(var, env) {

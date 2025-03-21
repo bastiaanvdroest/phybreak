@@ -200,7 +200,7 @@ update_reproduction <- function(){
     p <- pbe0$p
     v <- pbe0$v
     
-    p$R <- sum(v$infectors > 0)/p$obs
+    p$R <- exp(log(p$R) + rnorm(1, 0, h$si.ir))
     ### update proposal environment
     copy2pbe1("p", le)
     

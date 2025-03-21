@@ -207,7 +207,7 @@ phybreak <- function(dataset, times = NULL,
   #################################
   helperslot <- list(si.mu = if(dataslot$nSNPs == 0) 0 else 2.38*sqrt(trigamma(dataslot$nSNPs)),
                      si.wh = 2.38*sqrt(trigamma(dataslot$nsamples - 1)),
-                     si.r = 0.5,
+                     si.r = 2.38*sqrt(trigamma(parameterslot$obs - 1)),
                      dist = distmatrix_phybreak(subset(dataslot$sequences, subset = 1:parameterslot$obs)),
                      est.mu = est.mu,
                      est.mG = est.gen.mean,
