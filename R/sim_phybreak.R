@@ -498,10 +498,17 @@ sim_contact_matrix <- function(sim.object, contact.prob.trans, contact.prop){
     random_vector <- rep(0, n)
     indices <- sample(1:n, sum(n))
     start <- 1
-    for (category in 1:length(contact.prob.trans)) {
+    category <- 1
+    while (category <= length(contact.prob.trans)) {
+      if (tp_contact_prob[category] == 0) {
+        category <- category + 1
+        next
+      }
       end <- start + tp_contact_prob[category] - 1
       random_vector[indices[start:end]] <- category
       start <- end + 1
+      category <- category + 1
+      next
     }
     # Split random_vector into n vectors
     tp_contacts <- lapply(1:length(contact.prob.trans), function(category) {
