@@ -366,7 +366,7 @@ update_R <- function() {
   p <- pbe0$p
   
   ### change to proposal state
-  p$R <- exp(log(p$R) + rnorm(1, 0, h$si.dist))
+  p$R <- exp(log(p$R) + rnorm(1, 0, h$si.ir))
   
   ### update proposal environment
   copy2pbe1("p", le)

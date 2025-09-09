@@ -167,7 +167,7 @@ sample_phybreak <- function(x, nsample, thin = 1, thinswap = 1, classic = 0, kee
   
   swap_thin <- 0
   shared_heats <- heats
-  
+
   for (sa in tail(1:length(s.posts[[1]]$mu), nsample)) {
     #if(shiny == TRUE) incProgress(1/length(tail(1:length(s.posts[[1]]$mu), nsample)))
     for (rep in 1:thin) {
@@ -201,7 +201,8 @@ sample_phybreak <- function(x, nsample, thin = 1, thinswap = 1, classic = 0, kee
           if (i == -4 && x$h$est.wh.s)  update_wh_slope()
           if (i == -5 && x$h$est.wh.e)  update_wh_exponent()
           if (i == -6 && x$h$est.wh.0)  update_wh_level()
-          if (i < -6)  x$updaters[[-6 - i]]()
+          if (i == -7 && x$h$est.R)  update_R()
+          if (i < -7)  x$updaters[[-7 - i]]()
           
           # if (i == -7 && x$h$est.wh.h) update_wh_history()
           # if (i == -8 && x$h$est.dist.e)  update_dist_exponent()

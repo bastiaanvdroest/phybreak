@@ -249,7 +249,6 @@ phybreak <- function(dataset, times = NULL,
   ############################### 
 
   add_modules_to_phybreak(le, ...)
-  
   dataslot <- le$dataslot
   if (!is.null(dataslot$removal.times)) dataset$removal.times <- dataslot$removal.times
   

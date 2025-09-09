@@ -26,9 +26,9 @@ add_modules_to_phybreak <- function(le,
     if(contact) le <- do.call(contact_parameters, c(le, extras.contact))
     else le$parameterslot$contact = FALSE
     
-    if(infectivity | !is.null(extras$infectivity_file) | !is.null(extras$removal.times)) 
-      le <- do.call(infectivity_parameters, c(le, extras.infectivity))
-    else le$parameterslot$infectivity = FALSE
+    if(infectivity | !is.null(extras$infectivity_file) | !is.null(le$dataset$removal.times)) {
+      le <- do.call(infectivity_parameters, c(le, extras.infectivity))}
+    else {le$parameterslot$infectivity = FALSE}
     
   } else {
     le[["likelihoods"]] <- list()
@@ -661,16 +661,15 @@ infectivity_parameters <- function(le, admission.times = NULL, removal.times = N
   # Use the Gamma distribution
   if(trans.model == "gamma"){
     # If no removal times, use standard Gamma distribution
-    if (is.null(removal.times)) return(le)
+    if (is.null(le$dataset$removal.times)) return(le)
     
     # If removal times are present, use adjusted Gamma distribution
     # Dataslot
-    if (is.null(removal.times)) {
+
       if (!is.null(le$dataset$removal.times)) {
         removal.times = le$dataset$removal.times
       }
-    }
-
+    
     le$dataslot <- c(le$dataslot, list(
       admission.times = admission.times,
       removal.times = removal.times
@@ -895,7 +894,6 @@ infectivity_parameters <- function(le, admission.times = NULL, removal.times = N
               probs <- 0
         }
       }
-      
       if(log)
         return(log(probs*norm_factor))
       else
