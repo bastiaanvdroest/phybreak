@@ -19,7 +19,7 @@
 #' @param arrow.lwd Arrow width.
 #' @param arrow.length Arrow point length, as default automatically scaled with outbreak size.
 #' @param arrow.col Arrow colour. Defaults to \code{"black"} if \code{plot.which = sample}, and otherwise to five
-#'   colours \code{c("blue", "green", "orange", "red", "purple")} indicating posterior support of infectors
+#'   colours ranging from \code{"mistyrose"} (light red) to \code{"red4"} (dark red) indicating posterior support of infectors
 #'   in bins of 0.2 width, from low to high support. Any vector of colours will be divided into equal-sized bins.
 #' @param sample.pch Character \code{par("pch")} used for sampling events.
 #' @param sample.lwd Line width of sampling event character.
@@ -111,19 +111,34 @@ plotTrans <- function(x, plot.which = c("sample", "edmonds", "mpc", "mtcc"), sam
       # tree2plot$infector[tree2plot$infector=="history"] <- "index"
       # tree2plot <- tree2plot[-1,]
       
-      vars <- list(sample.times = as.numeric(x$d$sample.times - x$d$reference.date),
+      vars <- list(reference.date = x$d$reference.date,
+                   sample.times = as.numeric(x$d$sample.times - x$d$reference.date),
                    sample.hosts = x$d$hostnames,
                    sim.infection.times = tree2plot[, 3],
                    sim.infectors = as.character(tree2plot[, 1]),
                    post.support = tree2plot[, 2])
-      if (!is.null(x$d$removal.times)) vars[['culling.times']] <- as.numeric(x$d$removal - x$d$reference.date)
+      if (!is.null(x$d$removal.times)){
+        if(inherits(vars$sim.infection.times, "Date")){
+          if(inherits(x$d$removal.times, "Date")){
+            vars <- c(vars, list(removal.times = x$d$removal.times))
+          } else {
+            vars <- c(vars, list(removal.times = as.Date(x$d$removal.times, origin = "1970-01-01")))
+          }
+        } else {
+          if(inherits(x$d$removal.times, "Date")){
+            vars <- c(vars, list(removal.times = as.numeric(x$d$removal.times - x$d$reference.date)))
+          }
+        }
+      }
       if (!is.null(x$d$adtimes)) vars[['admin.times']] <- as.numeric(x$d$adtimes - x$d$reference.date)
       names(vars$sample.times) <- x$d$hostnames
       names(vars$sim.infection.times) <- x$d$hostnames[1:x$p$obs]
       names(vars$sim.infectors) <- x$d$hostnames[1:x$p$obs]
       names(vars$post.support) <- x$d$hostnames[1:x$p$obs]
       if(is.null(arrow.col)) {
-        arrow.col <- c("blue", "green", "orange", "red", "purple")
+        reds_palette <- colorRampPalette(c("mistyrose", "red4"))
+        arrow.col <- reds_palette(5)
+        # arrow.col <- c("blue", "green", "orange", "red", "purple")
       }
       tg.mean <- median(x$s$mG)
       tg.shape = x$p$gen.shape
@@ -225,11 +240,12 @@ maketransplot <- function(x, tg.mean = NA, tg.shape = NA, ttrans = NULL, mar = 0
   timedorder <- order(head(ordertimes, -1))
   inftimes <- x$sim.infection.times[timedorder]
   samtimes <- x$sample.times[timedorder]
-  cultimes <- x$culling.times[timedorder]
+  remtimes <- x$removal.times[timedorder]
   adtimes <- x$admin.times[timedorder]
   infectors <- x$sim.infectors[timedorder]
   arrow.colours <- arrow.colours[timedorder]
   hosts <- names(inftimes)
+  refdate <- x$reference.date
 
   ### determine rank of each host in the plot (line number)
   plotrank <- rankhostsforplot(hosts, infectors)
@@ -241,7 +257,7 @@ maketransplot <- function(x, tg.mean = NA, tg.shape = NA, ttrans = NULL, mar = 0
   
   ### calculate parameters needed for plotting
   tmin <- if (is.null(adtimes))  min(inftimes) else min(adtimes, inftimes)
-  tmax <- if (is.null(cultimes)) max(samtimes) else max(cultimes)
+  tmax <- if (is.null(remtimes)) max(samtimes) else max(remtimes)
   tstep <- as.numeric(tmax-tmin)/2000
   tgmean <- if(is.na(tg.mean)) as.numeric(mean(inftimes - inftimes[infectors], na.rm = T)) else tg.mean
   tgvar <- if(is.na(tg.shape)) as.numeric(var(inftimes - inftimes[infectors], na.rm = T)) else NA
@@ -302,18 +318,29 @@ maketransplot <- function(x, tg.mean = NA, tg.shape = NA, ttrans = NULL, mar = 0
     x0s <- seq(inftimes[i], tmax - tstep, tstep)
     #widths <- abs(1 - (maxwd - dgamma(x0s - inftimes[i], shape = tgshape, scale = tgscale)) / maxwd)
     if(p$trans.model == "user"){
-      widths <- sapply(x0s, function(x){
-        ifelse(x <= cultimes[i], infect_distribution(x, inftimes[i],
-                                                     le = list(p = p, 
-                                                               v = list(nodetimes = samtimes, inftimes = inftimes), 
-                                                               d = list(removal.times = cultimes)),
-                                                     nodetimes = samtimes, host = i, log = FALSE), 0)
-      })
-      widths <- widths/max(widths)
-    } else if (!is.null(cultimes)) {
+      # widths <- sapply(x0s, function(x){
+      #   ifelse(x <= remtimes[i], infect_distribution(x, inftimes[i],
+      #                                                le = list(p = p, 
+      #                                                          v = list(nodetimes = samtimes, inftimes = inftimes), 
+      #                                                          d = list(removal.times = remtimes, reference.date = refdate)),
+      #                                                nodetimes = samtimes, host = i, log = FALSE), 0)
+      # })
+      infect_vals <- infect_distribution(x0s, inftimes[i],
+                                  le = list(p = p, 
+                                            v = list(nodetimes = samtimes, inftimes = inftimes), 
+                                            d = list(removal.times = remtimes, reference.date = refdate)),
+                                  nodetimes = samtimes, log = FALSE)
+
+      widths <- ifelse(x0s <= remtimes[i],infect_vals, 0)
+      if(max(widths) > 0){
+        widths <- widths / max(widths) * 1
+      } else {
+      widths <- widths  # alle nul
+    }
+    } else if (!is.null(remtimes)) {
       widths <- sapply(x0s, function(x){
         #if (x0s < adtimes[i]) return(0)
-        if (x <= cultimes[i]) return(infect_distribution(x, inftimes[i],
+        if (x <= remtimes[i]) return(infect_distribution(x, inftimes[i],
                                                      le = list(p = p, v = list(nodetimes = samtimes)),
                                                      nodetimes = samtimes))
         else return(0)
@@ -377,6 +404,9 @@ maketransplot <- function(x, tg.mean = NA, tg.shape = NA, ttrans = NULL, mar = 0
           )
   
   ### Samples
+  if(!inherits(x$sample.times, "Date") | inherits(inftimes,"Dates")) 
+    x$sample.times <- as.Date(x$sample.times, origin = x$reference.date)
+
   do.call(points,
           c(list(x = x$sample.times, 
                  y = plotrank[match(names(x$sample.times), hosts)],
@@ -399,9 +429,9 @@ maketransplot <- function(x, tg.mean = NA, tg.shape = NA, ttrans = NULL, mar = 0
             ))
   
   ### Removal times
-  if(!is.null(cultimes))
+  if(!is.null(remtimes))
     do.call(points,
-          c(list(x = cultimes, 
+          c(list(x = remtimes, 
                  y = plotrank,
                  pch = 6, 
                  lwd = sample.lwd, 

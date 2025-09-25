@@ -44,8 +44,51 @@ add_modules_to_phybreak <- function(le,
 
 #####
 ### Multiple introductions ###
-
-# Add data and parameters to phybreak.object
+#' Define and initialize introduction parameters for a phybreak object
+#'
+#' This function extends a \code{phybreak} object with parameters related
+#' to multiple introductions, introduction rates, reproduction rates,
+#' and within-host history. It sets initial values, estimation flags, and priors, and
+#' prepares empty containers for posterior samples.
+#'
+#' @param multiple.introductions Logical; whether to include multiple introductions 
+#' in the model (default = \code{TRUE}).
+#' @param le A \code{phybreak} object given by the \code{phybreak} function.
+#' @param introductions Initial number of pathogen introductions into the population
+#'   (default = 1).
+#' @param wh.history Initial within-host history length parameter (default = 1).
+#' @param intro.rate Initial introduction rate (default = 1).
+#' @param reproduction.rate Initial reproduction number \eqn{R} (default = 1).
+#' @param est.intro.rate Logical; whether to estimate the introduction rate (default = \code{TRUE}).
+#' @param prior.intro.rate.mean,prior.intro.rate.shape Mean and shape parameters of the prior
+#'   (Gamma) distribution for the introduction rate (default = 1, 1).
+#' @param est.reproduction Logical; whether to estimate the reproduction rate \eqn{R} (default = \code{TRUE}).
+#' @param prior.reproduction.rate Prior value for the reproduction rate (default = 0.1).
+#' @param est.wh.history Logical; whether to estimate the within-host history parameter (default = \code{TRUE}).
+#' @param prior.wh.history.shape,prior.wh.history.mean Shape and mean parameters of the prior
+#'   (Gamma) distribution for the within-host history length (default = 1, 100).
+#' @param use.NJtree Logical; whether to initialize using a Neighbor-Joining tree (default = \code{TRUE}).
+#'
+#' @return The input object \code{le}, extended with:
+#' \itemize{
+#'   \item \strong{parameterslot}: containing introductions, introduction rate, reproduction rate,
+#'   within-host history, and initialization settings.
+#'   \item \strong{helperslot}: containing estimation flags and prior values for introduction,
+#'   reproduction, and within-host history parameters.
+#'   \item \strong{sampleslot}: empty containers for posterior samples of introduction-related parameters.
+#' }
+#'
+#' @details
+#' This module is intended to prepare a phybreak object for inference involving multiple
+#' introductions and reproduction rate estimation. Priors are specified using Gamma distributions
+#' for the introduction rate and within-host history, while the reproduction rate can be given
+#' a fixed prior mean.
+#'
+#' @examples
+#' # Example: add introduction parameters to a phybreak object
+#' MCMCstate <- phybreak(dataset, multiple.introductions = TRUE, use.NJtree = TRUE, est.reproduction = TRUE)
+#' 
+#' @seealso \code{\link{phybreak}}, \code{\link{contact_parameters}}, \code{\link{spatial_parameters}}
 #' @export
 introductions_parameters <- function(le, introductions = 1, 
     wh.history = 1, intro.rate = 1, reproduction.rate = 1,
@@ -195,6 +238,55 @@ introductions_functions <- function(le){
 
 #####
 ### Spatial distance ###
+#' Define and initialize spatial parameters for a phybreak object
+#'
+#' This function extends a \code{phybreak} object within the \code{phybreak} function with
+#' spatial information and corresponding model parameters. It sets up the spatial model,
+#' attaches locations and/or distances to the data slot, initializes priors for parameter
+#' estimation, and prepares empty sample containers for MCMC output.
+#'
+#' @param spatial Logical; whether to include spatial parameters in the model (default = \code{FALSE}).
+#' @param le A \code{phybreak} object given by the \code{phybreak} function. 
+#' The \code{phybreak} object should contain \code{locations} and/or \code{distances}. 
+#' @param dist.model A character string specifying the spatial distance model. Options
+#'   include \code{"power"}, \code{"exponential"}, or \code{"poisson"} (default = \code{"power"}).
+#' @param dist.exponent Initial value for the distance exponent in the spatial model
+#'   (default = 2).
+#' @param dist.scale Initial scale parameter for the distance model (default = 1).
+#' @param dist.mean Initial mean parameter, used if \code{dist.model = "poisson"}
+#'   (default = 1).
+#' @param est.dist.exponent Logical; whether to estimate the distance exponent (default = \code{TRUE}).
+#' @param prior.dist.exponent.shape,prior.dist.exponent.mean Shape and mean of the prior
+#'   (Gamma) distribution for the distance exponent (default = 1, 1).
+#' @param est.dist.scale Logical; whether to estimate the distance scale (default = \code{TRUE}).
+#' @param prior.dist.scale.shape,prior.dist.scale.mean Shape and mean of the prior
+#'   (Gamma) distribution for the distance scale (default = 1, 1).
+#' @param est.dist.mean Logical; whether to estimate the distance mean (only relevant for
+#'   \code{dist.model = "poisson"}; default = \code{TRUE}).
+#' @param prior.dist.mean.shape,prior.dist.mean.mean Shape and mean of the prior
+#'   (Gamma) distribution for the distance mean (default = 1, 1).
+#'
+#' @return The input object \code{le}, extended with:
+#' \itemize{
+#'   \item \strong{dataslot}: containing locations, distances, and computed area (if available).
+#'   \item \strong{parameterslot}: containing spatial model type and initial values for
+#'   distance parameters.
+#'   \item \strong{helperslot}: containing estimation flags and prior values for spatial
+#'   parameters.
+#'   \item \strong{sampleslot}: empty containers for posterior samples of spatial parameters.
+#' }
+#'
+#' @details
+#' If only distances are provided in the dataset, the function uses multidimensional scaling
+#' (\code{cmdscale}) to approximate locations. The area of the spatial domain is computed
+#' from the range of the provided or derived coordinates.
+#'
+#' @examples
+#' # Example: add spatial parameters to a phybreak-like object
+#' MCMCstate <- phybreak(dataset, spatial = TRUE, dist.model = "power")
+#'
+#' @seealso \code{\link{phybreak}}, \code{\link{contact_parameters}}
+#' @export
 spatial_parameters <- function(le,
     dist.model = "power", dist.exponent = 2, dist.scale = 1, dist.mean = 1,
     est.dist.exponent = TRUE, prior.dist.exponent.shape = 1, prior.dist.exponent.mean = 1,
@@ -692,67 +784,61 @@ infectivity_parameters <- function(le, admission.times = NULL, removal.times = N
     ))
     
     le$parameterslot[["inf_function"]] <- function(time, inftimes, le, nodetimes, 
-                                                   host, log = FALSE,
-                                                   test.arguments = FALSE){
-      
-      p <- le$p
-      v <- le$v
-      
-      # Calculate normalization factor by calculating mean AUC of infectiousness function
-      AUCs <- unlist(lapply(1:length(v$inftimes), function(i){
-        remtime = as.numeric(le$d$removal.times)[i] - v$inftimes[i]
-        remtime.prob = dgamma(remtime,
-                              shape = le$p$gen.shape,
-                              scale = le$p$gen.mean/le$p$gen.shape)
-        probs <- sum(pgamma(remtime,
-                            shape = le$p$gen.shape,
-                            scale = le$p$gen.mean/le$p$gen.shape,
-                            log = FALSE),
-                     (1 - exp(-5*le$p$removal.rate) * (remtime.prob/le$p$removal.rate) ))
-        return(probs)
-      }))
-      norm_factor <- 1/mean(AUCs)
-      
-      remtimes <- as.numeric(le$d$removal.times[match(inftimes, v$inftimes)] - inftimes)
-      admission.times <- if (is.null(le$d$admission.times)) rep(0, length(v$inftimes)) else le$d$admission.times[match(inftimes,v$inftimes)] - inftimes
-      hosttimes <- as.numeric(time - inftimes)
-      
-      C = p$removal.rate 
-      
-      if (length(hosttimes) == 0){
-        probs = 1
-      } else {
-        
-        if(is.null(host)){
-          if(length(hosttimes) != length(nodetimes)){
-            probs <- 0.1
-            j <- 1
-          } else {
-            probs <- c()
-            j <- 0
-          }
-          for (i in 1:length(remtimes)){
-            if(hosttimes[i+j] < admission.times[i])
-              probs <- c(probs, 0)
-            else if(hosttimes[i+j] <= remtimes[i])
-              probs <- c(probs, dgamma(hosttimes[i+j],
-                                       shape = p$gen.shape,
-                                       scale = p$gen.mean/p$gen.shape))
-            else if(hosttimes[i+j] >= remtimes[i])
-              probs <- c(probs, dgamma(hosttimes[i+j], 
-                                       shape = p$gen.shape,
-                                       rate = p$gen.mean/p$gen.shape) * exp(-C*(hosttimes[i+j]-remtimes[i])))
-            # else 
-            #   probs <- c(probs, 0)
-          }
-        }
-      }
-          
-      if(log)
-        return(log(probs*norm_factor))
-      else 
-        return(probs*norm_factor)
+                                               host, log = FALSE,
+                                               test.arguments = FALSE) {
+  
+    p <- le$p
+    v <- le$v
+    
+   # Convert removal times to numeric relative to reference
+    all_remtimes <- as.numeric(le$d$removal.times - le$d$reference.date) - v$inftimes
+    admission.times <- if (is.null(le$d$admission.times)) {
+      rep(0, length(inftimes))
+    } else {
+      le$d$admission.times[match(inftimes, v$inftimes)] - inftimes
     }
+
+    hosttimes <- as.numeric(time - inftimes)
+    remtimes <- as.numeric(le$d$removal.times[match(inftimes, v$inftimes)] - le$d$reference.date) - inftimes
+
+    # --- Normalization factor ---
+    # Expected cumulative infectiousness until removal is pgamma(remtime)
+    # Compute expected cumulative infectiousness for all hosts
+    all_aucs <- pgamma(all_remtimes, shape = p$gen.shape, scale = p$gen.mean / p$gen.shape)
+
+    # Normalization factor using all hosts
+    norm_factor <- 1 / mean(all_aucs, na.rm = TRUE)    
+
+    # --- Compute infectiousness ---
+    probs <- numeric(length(hosttimes))
+    
+    before_admission <- hosttimes < admission.times
+    before_removal   <- hosttimes >= admission.times & hosttimes <= remtimes
+    after_removal    <- hosttimes > remtimes
+    
+    # gamma density until removal
+    probs[before_removal] <- dgamma(
+      hosttimes[before_removal],
+      shape = p$gen.shape,
+      scale = p$gen.mean / p$gen.shape
+    )
+    
+    # decay after removal
+    probs[after_removal] <- dgamma(
+      remtimes[after_removal],
+      shape = p$gen.shape,
+      scale = p$gen.mean / p$gen.shape
+    ) * exp(-p$removal.rate * (hosttimes[after_removal] - remtimes[after_removal]))
+    
+    # admission constraint: already 0 by default
+    
+    # --- Return ---
+    if (log) {
+      return(log(probs * norm_factor))
+    } else {
+      return(probs * norm_factor)
+    }
+  }
     return(le)
   }
   
@@ -802,103 +888,198 @@ infectivity_parameters <- function(le, admission.times = NULL, removal.times = N
     
     # Infectivity function
     le$parameterslot[["inf_function"]] <- function(time, inftimes, le, nodetimes, 
-                                                                      host, log = FALSE,
+                                                                      host = NULL, log = FALSE,
                                                                       test.arguments = FALSE){
       
       d <- le$d
       p <- le$p
       v <- le$v
+      # --- argument checks ---
+      if (is.null(d$removal.times)) stop("removal times of hosts must be provided")
+      if (is.null(p$trans.init))    stop("initial fraction infected is missing")
+      if (is.null(p$trans.growth))  stop("growth factor of infectiousness is missing")
+      if (is.null(p$trans.sample))  stop("reduction factor after first positive sample is missing")
+      if (is.null(p$trans.removal)) stop("decay factor after removal is missing")
       
-      if (is.null(d$removal.times)) {
-        stop("removal times of hosts must be provided")
-      } else {
-        removal.times <- d$removal.times
-        # if(inherits(removal.times, "Date")){
-        #   removal.times <- as.numeric(removal.times - d$reference.date)
-        # }
+      if (test.arguments) return()
+
+      # --- make sure all times are numeric ---
+      check_time_class <- function(times){
+        if (inherits(times, "Date")) {
+          if (is.null(d$reference.date)) {
+            stop("reference.date must be provided when using Date() input for times")
+          }
+          return(as.numeric(difftime(times, d$reference.date, units = "days")))
+        } else {
+          return(as.numeric(times))
+        }
       }
       
-      if(test.arguments) return()
+      removal.times <- check_time_class(d$removal.times)
+      inftimes <- check_time_class(inftimes)
+      v$inftimes <- check_time_class(v$inftimes)
+      time <- check_time_class(time)
 
-      if(is.null(p$trans.init))
-        stop("initial fraction infected is missing")
-      if(is.null(p$trans.growth))
-        stop("growth factor of infectiousness is missing")
-      if(is.null(p$trans.sample))
-        stop("reduction factor after first positive sample is missing")
-      if(is.null(p$trans.removal))
-        stop("decay factor after removal is missing")
-      
-      a <- (1-p$trans.init)/p$trans.init
+      # --- parameters ---
+      a <- (1 - p$trans.init) / p$trans.init
       r <- p$trans.growth
       S <- p$trans.sample
-      C <- p$trans.removal
-      
-      # Calculate normalization factor by calculating mean AUC of infectiousness function
-      AUCs <- unlist(lapply(1:length(v$inftimes), function(i){
-        samtime = as.numeric(v$nodetimes[i] - v$inftimes[i])
-        cultime = as.numeric(removal.times[i] - v$inftimes[i])
-        if (r*samtime < 100){
-          probs = sum((log(a+exp(r*samtime)) - log(a+1)) / r,
-                      S * ( log(a+exp(r*cultime)) - log(a+exp(r*samtime)) ) / r,
-                      (S / (1 + a*exp(-r*cultime))) / C)
-        } else {
-          probs = sum((r*samtime - log(a+1)) / r,
-                      S * ( r*(cultime - samtime) ) / r,
-                      S / C)
-        }
-        return(probs)
-      }))
-      norm_factor <- 1/mean(AUCs)
-      
-      # Use removal times of infectors in rest of calculations
-      cultimes <- removal.times[match(inftimes, v$inftimes)]
+      C <- p$trans.removal 
+
+      # --- normalisation: mean AUC per host ---
+      st <- as.numeric(v$nodetimes[1:length(v$inftimes)] - v$inftimes)
+      rt <- as.numeric(removal.times - v$inftimes)
+
+      AUCs <- ifelse(r * st < 100,
+                    (log(a + exp(r * st)) - log(a + 1)) / r +
+                    S * (log(a + exp(r * rt)) - log(a + exp(r * st))) / r +
+                    (S / (1 + a * exp(-r * rt))) / C,
+                    
+                    (r * st - log(a + 1)) / r +
+                    S * (r * (rt - st)) / r +
+                    S / C)
+      norm_factor <- 1 / mean(AUCs)
+
+      # --- times relative to infection ---
+      remtimes <- removal.times[match(inftimes, v$inftimes)] - inftimes
       samtimes <- as.numeric(nodetimes - inftimes)
-      cultimes <- as.numeric(cultimes - inftimes)
       hosttimes <- as.numeric(time - inftimes)
-      
-      if (length(hosttimes) == 0){
-        probs = 1
-      } else {
+
+      # --- infectivity calculation ---
+      if (length(hosttimes) == 0) {
+        probs <- 1
+      } else if (is.null(host)) {
+        probs <- numeric(length(hosttimes))
         
-        if(is.null(host)){
-          if(length(hosttimes) != length(nodetimes)){
-            probs <- 0.1
-            j <- 1
-          } else {
-            probs <- c()
-            j <- 0
-          }
-          for (i in 1:length(samtimes)){
-            if(hosttimes[i+j] < 0)
-              probs <- c(probs, 0)
-            else if(hosttimes[i+j] < samtimes[i])
-              probs <- c(probs, 1/(1+a*exp(-r*hosttimes[i+j])))
-            else if(hosttimes[i+j] >= samtimes[i] & hosttimes[i+j] < cultimes[i])
-              probs <- c(probs, S/(1+a*exp(-r*hosttimes[i+j])))
-            else if(hosttimes[i+j] >= cultimes[i] & hosttimes[i+j] < cultimes[i] + 5)
-              probs <- c(probs, S/(1+a*exp(-r*cultimes[i])) * exp(-C*(hosttimes[i+j]-cultimes[i])))
-            else 
-              probs <- c(probs, 0)
-          }
+        # vectorized conditions
+        cond1 <- hosttimes < 0
+        cond2 <- hosttimes >= 0 & hosttimes < samtimes
+        cond3 <- hosttimes >= samtimes & hosttimes < remtimes
+        cond4 <- hosttimes >= remtimes & hosttimes < (remtimes + 5)
+        
+        probs[hosttimes < 0] <- 0
+        probs[hosttimes >= 0 & hosttimes < samtimes] <- 1 / (1 + a * exp(-r * hosttimes[cond2]))
+        probs[hosttimes >= samtimes & hosttimes < remtimes] <- S / (1 + a * exp(-r * hosttimes[cond3]))
+        probs[hosttimes >= remtimes & hosttimes < (remtimes + 5)] <- S / (1 + a * exp(-r * remtimes[cond4])) * 
+                        exp(-C * (hosttimes[cond4] - remtimes[cond4]))
+        
+      } else {
+        ht <- hosttimes
+        st <- samtimes[host]
+        rt <- remtimes[host]
+        
+        if (ht < 0) {
+          probs <- 0
+        } else if (ht < st) {
+          probs <- 1 / (1 + a * exp(-r * ht))
+        } else if (ht < rt) {
+          probs <- S / (1 + a * exp(-r * ht))
+        } else if (ht < rt + 5) {
+          probs <- S / (1 + a * exp(-r * rt)) * exp(-C * (ht - rt))
         } else {
-          if(hosttimes < 0)
-              probs <- 0
-            else if(hosttimes < samtimes[host])
-              probs <- 1/(1+a*exp(-r*hosttimes))
-            else if(hosttimes >= samtimes[host] & hosttimes < cultimes)
-              probs <- S/(1+a*exp(-r*hosttimes))
-            else if(hosttimes >= cultimes[host] & hosttimes < cultimes + 5)
-              probs <- S/(1+a*exp(-r*cultimes)) * exp(-C*(hosttimes-cultimes))
-            else 
-              probs <- 0
+          probs <- 0
         }
       }
-      if(log)
-        return(log(probs*norm_factor))
-      else
-        return(probs*norm_factor)
+      
+      out <- probs * norm_factor
+      if (log) return(log(out))
+      return(out)
     }
+
+      # d <- le$d
+      # p <- le$p
+      # v <- le$v
+      
+      # if (is.null(d$removal.times)) {
+      #   stop("removal times of hosts must be provided")
+      # } else {
+      #   removal.times <- d$removal.times
+      #   # if(inherits(removal.times, "Date")){
+      #   #   removal.times <- as.numeric(removal.times - d$reference.date)
+      #   # }
+      # }
+      
+      # if(test.arguments) return()
+
+      # if(is.null(p$trans.init))
+      #   stop("initial fraction infected is missing")
+      # if(is.null(p$trans.growth))
+      #   stop("growth factor of infectiousness is missing")
+      # if(is.null(p$trans.sample))
+      #   stop("reduction factor after first positive sample is missing")
+      # if(is.null(p$trans.removal))
+      #   stop("decay factor after removal is missing")
+      
+      # a <- (1-p$trans.init)/p$trans.init
+      # r <- p$trans.growth
+      # S <- p$trans.sample
+      # C <- p$trans.removal
+      
+      # # Calculate normalization factor by calculating mean AUC of infectiousness function
+      # AUCs <- unlist(lapply(1:length(v$inftimes), function(i){
+      #   samtime = as.numeric(v$nodetimes[i] - v$inftimes[i])
+      #   cultime = as.numeric(removal.times[i] - v$inftimes[i])
+      #   if (r*samtime < 100){
+      #     probs = sum((log(a+exp(r*samtime)) - log(a+1)) / r,
+      #                 S * ( log(a+exp(r*cultime)) - log(a+exp(r*samtime)) ) / r,
+      #                 (S / (1 + a*exp(-r*cultime))) / C)
+      #   } else {
+      #     probs = sum((r*samtime - log(a+1)) / r,
+      #                 S * ( r*(cultime - samtime) ) / r,
+      #                 S / C)
+      #   }
+      #   return(probs)
+      # }))
+      # norm_factor <- 1/mean(AUCs)
+      
+      # # Use removal times of infectors in rest of calculations
+      # cultimes <- removal.times[match(inftimes, v$inftimes)]
+      # samtimes <- as.numeric(nodetimes - inftimes)
+      # cultimes <- as.numeric(cultimes - inftimes)
+      # hosttimes <- as.numeric(time - inftimes)
+      
+      # if (length(hosttimes) == 0){
+      #   probs = 1
+      # } else {
+        
+      #   if(is.null(host)){
+      #     if(length(hosttimes) != length(nodetimes)){
+      #       probs <- 0.1
+      #       j <- 1
+      #     } else {
+      #       probs <- c()
+      #       j <- 0
+      #     }
+      #     for (i in 1:length(samtimes)){
+      #       if(hosttimes[i+j] < 0)
+      #         probs <- c(probs, 0)
+      #       else if(hosttimes[i+j] < samtimes[i])
+      #         probs <- c(probs, 1/(1+a*exp(-r*hosttimes[i+j])))
+      #       else if(hosttimes[i+j] >= samtimes[i] & hosttimes[i+j] < cultimes[i])
+      #         probs <- c(probs, S/(1+a*exp(-r*hosttimes[i+j])))
+      #       else if(hosttimes[i+j] >= cultimes[i] & hosttimes[i+j] < cultimes[i] + 5)
+      #         probs <- c(probs, S/(1+a*exp(-r*cultimes[i])) * exp(-C*(hosttimes[i+j]-cultimes[i])))
+      #       else 
+      #         probs <- c(probs, 0)
+      #     }
+      #   } else {
+      #     if(hosttimes < 0)
+      #         probs <- 0
+      #       else if(hosttimes < samtimes[host])
+      #         probs <- 1/(1+a*exp(-r*hosttimes))
+      #       else if(hosttimes >= samtimes[host] & hosttimes < cultimes)
+      #         probs <- S/(1+a*exp(-r*hosttimes))
+      #       else if(hosttimes >= cultimes[host] & hosttimes < cultimes + 5)
+      #         probs <- S/(1+a*exp(-r*cultimes)) * exp(-C*(hosttimes-cultimes))
+      #       else 
+      #         probs <- 0
+      #   }
+      # }
+      # if(log)
+      #   return(log(probs*norm_factor))
+      # else
+      #   return(probs*norm_factor)
+      # }
     
     return(le)
   }

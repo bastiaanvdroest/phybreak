@@ -12,7 +12,7 @@ infectorsets(
   samplesize = Inf,
   infector.name = TRUE,
   support = c("proportion", "count"),
-  output = c("list", "matrix")
+  output = c("list", "matrix", "plot")
 )
 }
 \arguments{

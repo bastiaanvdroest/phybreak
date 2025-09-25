@@ -21,6 +21,7 @@ sample_phybreak(
   heats = NULL,
   all_chains = FALSE,
   parallel = FALSE,
+  shiny = FALSE,
   ...
 )
 

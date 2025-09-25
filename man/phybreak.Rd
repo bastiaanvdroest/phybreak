@@ -10,23 +10,13 @@ phybreak(
   mu = NULL,
   gen.shape = 3,
   gen.mean = 1,
-  trans.model = "gamma",
-  infectivity_file = NULL,
   sample.shape = 3,
   sample.mean = 1,
-  multiple.introductions = FALSE,
-  introductions = 1,
-  intro.rate = 1,
   wh.model = "linear",
   wh.bottleneck = "auto",
-  wh.history = 1,
   wh.slope = 1,
   wh.exponent = 1,
   wh.level = 0.1,
-  dist.model = "power",
-  dist.exponent = 2,
-  dist.scale = 1,
-  dist.mean = 1,
   est.mu = TRUE,
   prior.mu.mean = 0,
   prior.mu.sd = 100,
@@ -36,9 +26,6 @@ phybreak(
   est.sample.mean = TRUE,
   prior.sample.mean.mean = 1,
   prior.sample.mean.sd = Inf,
-  est.intro.rate = TRUE,
-  prior.intro.rate.mean = 1,
-  prior.intro.rate.shape = 1,
   est.trans.growth = TRUE,
   est.trans.sample = TRUE,
   est.wh.slope = TRUE,
@@ -50,20 +37,7 @@ phybreak(
   est.wh.level = TRUE,
   prior.wh.level.shape = 1,
   prior.wh.level.mean = 0.1,
-  est.wh.history = TRUE,
-  prior.wh.history.shape = 1,
-  prior.wh.history.mean = 100,
-  est.dist.exponent = TRUE,
-  prior.dist.exponent.shape = 1,
-  prior.dist.exponent.mean = 1,
-  est.dist.scale = TRUE,
-  prior.dist.scale.shape = 1,
-  prior.dist.scale.mean = 1,
-  est.dist.mean = TRUE,
-  prior.dist.mean.shape = 1,
-  prior.dist.mean.mean = 1,
   use.tree = FALSE,
-  use.NJtree = TRUE,
   ...
 )
 }
@@ -162,8 +136,7 @@ to create a \code{phybreak}-object with an exact copy of the outbreak. This requ
 the slot \code{individuals} with vectors \code{infector} and \code{date}, and the slot \code{trees} with at least 
 one phylogenetic tree. Such data can be simulated with \code{\link{sim.phybreak}}.}
 
-\item{...}{If arguments from previous versions of this function are used, they may be interpreted correctly through 
-this argument, but it is better to provide the correct argument names.}
+\item{...}{Arguments for additional modules can be given here. See details.}
 }
 \value{
 An object of class \code{phybreak} with the following elements
@@ -188,6 +161,15 @@ nucleotides in columns) and sampling times, and potentially more. Parameter valu
 initial values in the MCMC-chain or kept fixed. All variables are initialized by random samples 
 from the prior distribution, unless a complete tree is given in the data and should be used 
 (\code{use.tree = TRUE}). It is also possible to provide only sequences as data, and sampling times separately.
+}
+\details{
+Available modules to be added as extensions to the basic model:
+\itemize{
+  \item Multiple introduction estimation (see \link{introductions_parameters})
+  \item Use geographical spatial data in the inference (see \link{spatial_parameters})
+  \item Use contact data in the inference (see \link{contact_parameters})
+  \item Use a different generation time distribution to represent infectiousness (see \link{infectivity_parameters})
+}
 }
 \examples{
 simulation <- sim_phybreak(obsize = 10)

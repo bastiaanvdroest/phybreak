@@ -72,8 +72,7 @@
 #'   to create a \code{phybreak}-object with an exact copy of the outbreak. This requires more data in \code{data}: 
 #'   the slot \code{individuals} with vectors \code{infector} and \code{date}, and the slot \code{trees} with at least 
 #'   one phylogenetic tree. Such data can be simulated with \code{\link{sim.phybreak}}.
-#' @param ... If arguments from previous versions of this function are used, they may be interpreted correctly through 
-#'   this argument, but it is better to provide the correct argument names.
+#' @param ... Arguments for additional modules can be given here. See details.
 #' @return An object of class \code{phybreak} with the following elements
 #'   \describe{
 #'     \item{d}{a \code{list} with data, i.e. names, sequences, sampling times, and total number of SNPs.}
@@ -89,6 +88,14 @@
 #'     \item{s}{an empty \code{list} that will contain vector and matrices with the posterior samples; 
 #'       in matrices, the rows are nodes in the phylogenetic tree, the columns are the samples}
 #'   }
+#' @details
+#' Available modules to be added as extensions to the basic model:
+#' \itemize{
+#'   \item Multiple introduction estimation (see \link{introductions_parameters})
+#'   \item Use geographical spatial data in the inference (see \link{spatial_parameters})
+#'   \item Use contact data in the inference (see \link{contact_parameters})
+#'   \item Use a different generation time distribution to represent infectiousness (see \link{infectivity_parameters})
+#' }
 #' @author Don Klinkenberg \email{don@@xs4all.nl}
 #' @references \href{http://dx.doi.org/10.1371/journal.pcbi.1005495}{Klinkenberg et al. (2017)} Simultaneous 
 #'   inference of phylogenetic and transmission trees in infectious disease outbreaks. 

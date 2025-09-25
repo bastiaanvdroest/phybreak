@@ -8,10 +8,10 @@ phybreakdata(
   sequences,
   sample.times,
   spatial = NULL,
+  contact = NULL,
+  removal.times = NULL,
   sample.names = NULL,
   host.names = sample.names,
-  culling.times = NULL,
-  external.sequence = FALSE,
   sim.infection.times = NULL,
   sim.infectors = NULL,
   sim.tree = NULL
@@ -27,13 +27,13 @@ nucleotides or ambiguity codes will be turned into \code{'n'}.}
 \item{spatial}{Either a distance matrix (\code{matrix} or \code{dist}), or locations as (x, y) or (lon, lat) 
 coordinates (two-column \code{matrix} or \code{data.frame}).}
 
+\item{removal.times}{A vector with removal dates. The vector identifies the removal date for each sample, so should be of
+of the same length as \code{sample.times}.}
+
 \item{sample.names}{A vector with sample names.}
 
 \item{host.names}{A vector with host names. The vector identifies the host for each sample, so should be of the same
 length as \code{sample.times}.}
-
-\item{culling.times}{A vector with culling dates. The vector identifies the culling date for each sample, so should be of
-of the same length as \code{sample.times}.}
 
 \item{sim.infection.times}{A vector with infection times (\code{numerical} or \code{Date}).}
 
@@ -47,7 +47,7 @@ An object of class \code{phybreakdata} with the following elements
     \item{sequences}{a \code{'phyDat'}-object with the sequence data.}
     \item{sample.times}{a named \code{vector} with the sample times.}
     \item{sample.hosts}{a named \code{vector} with the hosts from whom the samples have been taken.}
-    \item{culling.timese}{a named \code{vector} with the dates of culling of the hosts.}
+    \item{removal.timese}{a named \code{vector} with the dates of removal of the hosts.}
     \item{distances}{a named distance matrix (class \code{dist}) with the mutual distances.}
     \item{sim.infection.times}{a named \code{vector} with the (simulated) infection times (if provided).}
     \item{sim.infectors}{a named \code{vector} with the (simulated) infectors (if provided).}
