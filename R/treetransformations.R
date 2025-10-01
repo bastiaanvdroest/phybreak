@@ -155,8 +155,8 @@ phybreak2trans <- function(vars, hostnames = c(), reference.date = 0,
 transphylo2phybreak <- function(vars, resample = FALSE, resamplepars = NULL, 
                                 introductions = 1, NJtree = FALSE) {
 
-  ### extract and order samples
-  refdate <- min(vars$sample.times)
+    ### extract and order samples
+  refdate <- as.Date(min(vars$sample.times))
   samtimes <- vars$sample.times - refdate
   nsamples <- length(samtimes)
   if(exists("sample.hosts", vars)) {
@@ -201,7 +201,7 @@ transphylo2phybreak <- function(vars, resample = FALSE, resamplepars = NULL,
   if(is.null(vars$sim.infection.times) | is.null(vars$sim.infectors) | resample) {
     resample <- TRUE
     inftimes <- .rinftimes(samtimes[1:nhosts], resamplepars$sample.mean, resamplepars$sample.shape)
-    infectors <- .rinfectors(inftimes, introductions, d = c(vars, reference.date = refdate), p = resamplepars, 
+    infectors <- .rinfectors(inftimes, introductions, d = c(vars, list(reference.date = refdate)), p = resamplepars, 
                                v = list(nodetimes = samtimes))
   } else {
     inftimes <- as.numeric(vars$sim.infection.times - refdate)

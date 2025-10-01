@@ -24,6 +24,7 @@ plotTrans(
   xlab = "Time",
   axis.cex = 1,
   title.cex = 1,
+  add.pch = 2,
   ...
 )
 }

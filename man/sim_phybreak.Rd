@@ -14,6 +14,7 @@ sim_phybreak(
   outbreak.duration = 10,
   R0 = 1.5,
   spatial = FALSE,
+  contact = FALSE,
   gen.shape = 10,
   gen.mean = 1,
   sample.shape = 10,
@@ -28,6 +29,8 @@ sim_phybreak(
   dist.model = "power",
   dist.exponent = 2,
   dist.scale = 1,
+  contact.prob.trans = 0.5,
+  contact.prop = 0.5,
   mu = 1e-04,
   sequence.length = 10000,
   ...
