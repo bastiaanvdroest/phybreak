@@ -345,49 +345,52 @@ spatial_functions <- function(le){
 
 #####
 ### Contact parameters ###
-#’ Define and initialize contact parameters for a phybreak object
-#’
-#’ This function extends a \code{phybreak} object with parameters related
-#’ to contact structures, including fractions of transmission occurring via different
-#’ contact matrices, contact proportions, estimation flags, and priors. It sets
-#’ initial values, translates prior means into appropriate parameters, and prepares
-#’ empty containers for posterior samples.
-#’
-#’ @param le A \code{phybreak} object given by the \code{phybreak} function.
-#’ @param contact.fracs Initial fractions of transmission attributed to each
-#’   contact type. If a single contact matrix is provided, the default is \code{0.5}.
-#’   If multiple contact matrices are provided, the default is equal allocation across
-#’   matrices (i.e., \code{1 / (number of matrices + 1)}).
-#’ @param est.cnt.fracs Logical; whether to estimate the contact fractions (default = \code{TRUE}).
-#’ @param prior.cnt.fracs.means Prior mean values for the contact fractions. If not specified,
-#’   defaults to a symmetric prior with equal weights (of 1) across all contact types.
-#’ @param prior.cnt.fracs.strength Numeric; strength parameter of the prior (interpreted
-#’   as a concentration parameter for the Dirichlet prior). Default = 10.
-#’ @param contact.prop Initial contact proportion(s). If not specified, calculated as the
-#’   mean connectivity of the contact matrix (or matrices).
-#’ @param est.cnt.prop Logical; whether to estimate the contact proportion(s) (default = \code{FALSE}).
-#’
-#’ @return The input object \code{le}, extended with:
-#’ \itemize{
-#’   \item \strong{parameterslot}: containing contact fractions, contact proportions, and flags.
-#’   \item \strong{helperslot}: containing estimation flags and transformed prior values for
-#’   contact fractions and contact proportions.
-#’   \item \strong{sampleslot}: empty containers for posterior samples of contact-related parameters.
-#’ }
-#’
-#’ @details
-#’ This module allows incorporation of heterogeneous contact structures into the model.
-#’ A single contact matrix or a list of contact matrices can be provided in the dataset.
-#’ Fractions of transmission are initialized either from user input or as uniform defaults,
-#’ and priors on these fractions are specified through Dirichlet parameters derived from
-#’ \code{prior.cnt.fracs.means} and \code{prior.cnt.fracs.strength}.
-#’
-#’ @examples
-#’ # Example: add contact parameters to a phybreak object
-#’ MCMCstate <- phybreak(dataset, contact = T, est.cnt.fracs = TRUE, est.cnt.prop = TRUE)
-#’
-#’ @seealso \code{\link{phybreak}}, \code{\link{introductions_parameters}}, \code{\link{spatial_parameters}}
-#’ @export
+#' Contact parameters
+#'
+#' Define and initialize contact parameters for a phybreak object.
+#'
+#' This function extends a \code{phybreak} object with parameters related
+#' to contact structures, including fractions of transmission occurring via different
+#' contact matrices, contact proportions, estimation flags, and priors. It sets
+#' initial values, translates prior means into appropriate parameters, and prepares
+#' empty containers for posterior samples.
+#'
+#' @param le A \code{phybreak} object given by the \code{phybreak} function.
+#' @param contact.fracs Initial fractions of transmission attributed to each
+#'   contact matrix. If a single contact matrix is provided, the default is \code{0.5}.
+#'   If multiple contact matrices are provided, the default is equal allocation across
+#'   matrices (i.e., \code{1 / (number of matrices + 1)}).
+#' @param est.cnt.fracs Logical; whether to estimate the contact fractions (default = \code{TRUE}).
+#' @param prior.cnt.fracs.means Prior mean values for the contact fractions. If not specified,
+#'   defaults to a symmetric prior with equal weights across all fractions.
+#' @param prior.cnt.fracs.strength Numeric; strength parameter of the prior (interpreted
+#'   as a concentration parameter for the Dirichlet prior). Default = 10.
+#' @param contact.prop Initial contact proportion(s). If not specified, calculated as the
+#'   mean connectivity of the contact matrix (or matrices).
+#' @param est.cnt.prop Logical; whether to estimate the contact proportion(s) (default = \code{FALSE}).
+#'
+#' @return The input object \code{le}, extended with:
+#' \itemize{
+#'   \item \strong{parameterslot}: containing contact fractions, contact proportions, and flags.
+#'   \item \strong{helperslot}: containing estimation flags and transformed prior values for
+#'   contact fractions and contact proportions.
+#'   \item \strong{sampleslot}: empty containers for posterior samples of contact-related parameters.
+#' }
+#'
+#' @details
+#' This module allows incorporation of heterogeneous contact structures into the model.
+#' A single contact matrix or a list of contact matrices can be provided in the dataset.
+#' Fractions of transmission are initialized either from user input or as uniform defaults,
+#' and priors on these fractions are specified through Dirichlet parameters derived from
+#' \code{prior.cnt.fracs.means} and \code{prior.cnt.fracs.strength}.
+#'
+#' @examples
+#' # Example: add contact parameters to a phybreak object
+#' MCMCstate <- phybreak(dataset)
+#' MCMCstate <- contact_parameters(MCMCstate, est.cnt.fracs = TRUE, est.cnt.prop = TRUE)
+#'
+#' @seealso \code{\link{phybreak}}
+#' @export
 contact_parameters <- function(le,
     contact.fracs = NA, est.cnt.fracs = T, 
     prior.cnt.fracs.means = NA, prior.cnt.fracs.strength = 10,
