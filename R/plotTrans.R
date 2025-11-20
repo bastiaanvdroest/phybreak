@@ -62,7 +62,7 @@
 #' @export
 plotTrans <- function(x, plot.which = c("sample", "edmonds", "mpc", "mtcc"), samplenr = 0,
                       mar = 0.1 + c(4, 0, 0, 0), label.cex = NULL, 
-                      label.space = 0.15, label.adj = 0,
+                      label.space = 0.15, label.adj = 0, label.aligned = TRUE,
                       arrow.lwd = 1, arrow.length = NULL, arrow.col = NULL, sample.pch = 4,
                       sample.lwd = NULL, sample.cex = label.cex, polygon.col = "gray", 
                       polygon.border = NA, line.lty = 3, xlab = "Time", 
@@ -201,7 +201,7 @@ plotTrans <- function(x, plot.which = c("sample", "edmonds", "mpc", "mtcc"), sam
   
   maketransplot(vars, tg.mean = tg.mean, tg.shape = tg.shape, ttrans = ttrans,
                 mar = mar, label.cex = label.cex, 
-                label.space = label.space, label.adj = label.adj,
+                label.space = label.space, label.adj = label.adj, label.aligned = label.aligned,
                 arrow.lwd = arrow.lwd, arrow.length = arrow.length, arrow.col = arrow.col, 
                 sample.pch = sample.pch, sample.lwd = sample.lwd, sample.cex = sample.cex, 
                 polygon.col = polygon.col, polygon.border = polygon.border, line.lty = line.lty,
@@ -209,7 +209,7 @@ plotTrans <- function(x, plot.which = c("sample", "edmonds", "mpc", "mtcc"), sam
 }
 
 maketransplot <- function(x, tg.mean = NA, tg.shape = NA, ttrans = NULL, mar = 0.1 + c(4, 0, 0, 0), label.cex = NULL, 
-                          label.space = 0.15, label.adj = 0,
+                          label.space = 0.15, label.adj = 0, label.aligned = TRUE,
                           arrow.lwd = 1, arrow.length = NULL, arrow.col = par("fg"), sample.pch = 4,
                           sample.lwd = NULL, sample.cex = label.cex, culling.pch = 7, polygon.col = "gray", 
                           polygon.border = NA, line.lty = 3, xlab = "Time", 
@@ -276,6 +276,9 @@ maketransplot <- function(x, tg.mean = NA, tg.shape = NA, ttrans = NULL, mar = 0
   }
     
   obs <- length(hosts)
+
+  if(!inherits(x$sample.times, "Date") | inherits(inftimes,"Dates")) 
+    x$sample.times <- as.Date(x$sample.times, origin = x$reference.date)
   
   ### some smart graphical parameters
   if(is.null(label.cex)) label.cex <- max(0.5, min(1, 30/obs))
@@ -361,16 +364,26 @@ maketransplot <- function(x, tg.mean = NA, tg.shape = NA, ttrans = NULL, mar = 0
               )
             )
   }
-  do.call(text,
-          c(list(x = tmax + 10 * tstep,
+  if(label.aligned){
+    do.call(text, 
+            c(list(x = tmax + 10 * tstep,
                  y = plotrank,
                  labels = hosts, 
                  adj = label.adj, 
                  cex = label.cex),
             graphicalparameters("label", timedorder, ...)))
-  
+  } else {
+    do.call(text,
+            c(list(x = x$sample.times[timedorder] + 20,
+                 y = plotrank,
+                 labels = hosts, 
+                 adj = label.adj, 
+                 cex = label.cex),
+            graphicalparameters("label", timedorder, ...)))
+  }
   ### Horizontal lines
-  do.call(segments,
+  if(label.aligned){
+    do.call(segments,
           c(list(x0 = if(is.null(adtimes)) inftimes else pmin(adtimes, inftimes),
                  y0 = plotrank,
                  x1 = tmax,
@@ -378,7 +391,7 @@ maketransplot <- function(x, tg.mean = NA, tg.shape = NA, ttrans = NULL, mar = 0
             graphicalparameters("line", 1, ...)
             )
           )
-  
+  }
   ### Arrows
   do.call(arrows,
           c(list(x0 = inftimes[infectors != "index"],
@@ -404,9 +417,6 @@ maketransplot <- function(x, tg.mean = NA, tg.shape = NA, ttrans = NULL, mar = 0
           )
   
   ### Samples
-  if(!inherits(x$sample.times, "Date") | inherits(inftimes,"Dates")) 
-    x$sample.times <- as.Date(x$sample.times, origin = x$reference.date)
-
   do.call(points,
           c(list(x = x$sample.times, 
                  y = plotrank[match(names(x$sample.times), hosts)],
