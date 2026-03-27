@@ -2,6 +2,7 @@
 Outbreak reconstruction with sequence data
 
 The package implements the method described in Klinkenberg et al (2016), doi: http://dx.doi.org/10.1101/069195
+and Van der Roest et al (2023), doi: https://doi.org/10.1371/journal.pcbi.1010928
 
 Workflow:
 
