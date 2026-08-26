@@ -1,8 +1,7 @@
-# phybreak
+t# phybreak
 Outbreak reconstruction with sequence data
 
-The package implements the method described in Klinkenberg et al (2016), doi: http://dx.doi.org/10.1101/069195
-
+The package implements the method described in Van der Roest et al. (2023), https://doi.org/10.1371/journal.pcbi.1010928
 Workflow:
 
 * enter data and priors by constructing an object of S3-class 'phybreak', with function 'phybreak'
@@ -32,3 +31,8 @@ The package can be directly installed from GitHub using the `devtools` R package
 ```r
 devtools::install_github("https://github.com/bastiaanvdroest/phybreak/")
 ```
+
+## Contact type contributions
+
+To estimate the contributions of different contact types on transmission, use the code on the contact branch of this repository.
+Here, the function 'phybreak' has the option to select 'contact = TRUE', such that the contact contributions are taken into account in the likelihood calculations of the MCMC algorithm in the model.
